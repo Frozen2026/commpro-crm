@@ -16,26 +16,48 @@ export async function getUserContext(): Promise<UserContext> {
     throw new Error("Unauthorized");
   }
 
-  const { data: membership, error: membershipError } = await supabase
+  const { data: membership } = await supabase
     .from("accounts_memberships")
     .select("account_id")
     .eq("user_id", user.id)
     .limit(1)
     .maybeSingle();
 
-  if (membershipError || !membership?.account_id) {
-    throw new Error("Missing account membership");
-  }
-
-  const accountId = String(membership.account_id);
-
   const { data: agentProfile } = await supabase
     .from("agent_profiles")
-    .select("agency_id")
+    .select("account_id, agency_id")
     .eq("id", user.id)
     .maybeSingle();
 
+  // Prefer membership account, then profile account, then any known agency account,
+  // and finally fall back to user id so pages can render instead of crashing.
+  let accountId = membership?.account_id
+    ? String(membership.account_id)
+    : agentProfile?.account_id
+      ? String(agentProfile.account_id)
+      : null;
+
   let agencyId = agentProfile?.agency_id ? String(agentProfile.agency_id) : null;
+
+  if (!accountId) {
+    const { data: anyAgency } = await supabase
+      .from("agencies")
+      .select("id, account_id")
+      .limit(1)
+      .maybeSingle();
+
+    if (anyAgency?.account_id) {
+      accountId = String(anyAgency.account_id);
+    }
+
+    if (!agencyId && anyAgency?.id) {
+      agencyId = String(anyAgency.id);
+    }
+  }
+
+  if (!accountId) {
+    accountId = user.id;
+  }
 
   if (!agencyId) {
     const { data: firstAgency } = await supabase

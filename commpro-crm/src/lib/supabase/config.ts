@@ -1,13 +1,19 @@
-function getEnv(name: "NEXT_PUBLIC_SUPABASE_URL" | "NEXT_PUBLIC_SUPABASE_ANON_KEY" | "SUPABASE_SERVICE_ROLE_KEY") {
-  const value = process.env[name];
+const publicSupabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const publicSupabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-  if (!value) {
-    throw new Error(`Missing environment variable: ${name}`);
-  }
-
-  return value;
+if (!publicSupabaseUrl) {
+  throw new Error("Missing environment variable: NEXT_PUBLIC_SUPABASE_URL");
 }
 
-export const supabaseUrl = getEnv("NEXT_PUBLIC_SUPABASE_URL");
-export const supabaseAnonKey = getEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY");
-export const supabaseServiceRoleKey = getEnv("SUPABASE_SERVICE_ROLE_KEY");
+if (!publicSupabaseAnonKey) {
+  throw new Error("Missing environment variable: NEXT_PUBLIC_SUPABASE_ANON_KEY");
+}
+
+export const supabaseUrl = publicSupabaseUrl;
+export const supabaseAnonKey = publicSupabaseAnonKey;
+
+export const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY ?? "";
+
+if (typeof window === "undefined" && !supabaseServiceRoleKey) {
+  throw new Error("Missing environment variable: SUPABASE_SERVICE_ROLE_KEY");
+}
