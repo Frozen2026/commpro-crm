@@ -18,10 +18,14 @@ export default async function ClientsPage() {
   const context = await getUserContext();
   const supabase = await createServerSupabaseClient();
 
+  if (!context.agencyId) {
+    throw new Error("No agency is configured for this account.");
+  }
+
   const { data } = await supabase
     .from("clients")
     .select("id, business_name, email, phone, city, state, created_at")
-    .eq("account_id", context.accountId)
+    .eq("agency_id", context.agencyId)
     .order("created_at", { ascending: false });
 
   const clients = (data ?? []) as ClientRow[];

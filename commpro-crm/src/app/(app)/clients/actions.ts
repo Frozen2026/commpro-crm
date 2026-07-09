@@ -16,7 +16,6 @@ export async function createClient(formData: FormData) {
   }
 
   const payload = {
-    account_id: context.accountId,
     agency_id: context.agencyId,
     owner_id: context.userId,
     first_name: getNullableString(formData, "first_name"),
@@ -61,7 +60,7 @@ export async function updateClient(formData: FormData) {
     .from("clients")
     .update(payload)
     .eq("id", id)
-    .eq("account_id", context.accountId);
+    .eq("agency_id", context.agencyId);
 
   if (error) {
     throw new Error(error.message);
@@ -82,7 +81,7 @@ export async function deleteClient(formData: FormData) {
     .from("clients")
     .delete()
     .eq("id", id)
-    .eq("account_id", context.accountId);
+    .eq("agency_id", context.agencyId);
 
   if (error) {
     throw new Error(error.message);

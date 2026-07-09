@@ -10,11 +10,15 @@ export default async function EditClientPage({ params }: { params: Promise<{ id:
   const context = await getUserContext();
   const supabase = await createServerSupabaseClient();
 
+  if (!context.agencyId) {
+    throw new Error("No agency is configured for this account.");
+  }
+
   const { data: client } = await supabase
     .from("clients")
     .select("id, first_name, last_name, business_name, email, phone, address, city, state, zip")
     .eq("id", id)
-    .eq("account_id", context.accountId)
+    .eq("agency_id", context.agencyId)
     .maybeSingle();
 
   if (!client) {
