@@ -2,7 +2,7 @@ import Link from "next/link";
 
 import { deleteClaim } from "@/app/(app)/claims/actions";
 import { getUserContext } from "@/lib/account-context";
-import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { createClient } from "@/lib/supabase/server";
 
 type ClaimRow = {
   id: string;
@@ -36,7 +36,7 @@ const statusClasses: Record<string, string> = {
 
 export default async function ClaimsPage() {
   const context = await getUserContext();
-  const supabase = await createServerSupabaseClient();
+  const supabase = await createClient();
 
   const { data } = await supabase
     .from("claims")

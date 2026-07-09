@@ -29,8 +29,8 @@ export default async function CarriersPage({
   const query = (params.q ?? "").trim();
   const selectedLine = (params.line_of_business ?? "").trim();
 
-  const { createServerSupabaseClient } = await import("@/lib/supabase/server");
-  const supabase = await createServerSupabaseClient();
+  const { createClient } = await import("@/lib/supabase/server");
+  const supabase = await createClient();
 
   const { data } = await supabase
     .from("insurance_carriers")

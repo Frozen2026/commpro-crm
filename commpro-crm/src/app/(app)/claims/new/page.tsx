@@ -2,11 +2,11 @@ import Link from "next/link";
 
 import { ClaimForm } from "@/app/(app)/claims/claim-form";
 import { getUserContext } from "@/lib/account-context";
-import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { createClient } from "@/lib/supabase/server";
 
 export default async function NewClaimPage() {
   const context = await getUserContext();
-  const supabase = await createServerSupabaseClient();
+  const supabase = await createClient();
 
   const { data } = await supabase
     .from("policies")

@@ -3,12 +3,12 @@ import { notFound } from "next/navigation";
 
 import { ClientForm } from "@/app/(app)/clients/client-form";
 import { getUserContext } from "@/lib/account-context";
-import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { createClient } from "@/lib/supabase/server";
 
 export default async function EditClientPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const context = await getUserContext();
-  const supabase = await createServerSupabaseClient();
+  const supabase = await createClient();
 
   let query = supabase
     .from("clients")

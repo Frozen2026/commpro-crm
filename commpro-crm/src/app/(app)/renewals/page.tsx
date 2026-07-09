@@ -49,11 +49,11 @@ export default async function RenewalsPage({
   const params = await searchParams;
   const statusFilter = (params.status ?? "").trim();
 
-  const { createServerSupabaseClient } = await import("@/lib/supabase/server");
+  const { createClient } = await import("@/lib/supabase/server");
   const { getUserContext } = await import("@/lib/account-context");
 
   await getUserContext();
-  const supabase = await createServerSupabaseClient();
+  const supabase = await createClient();
 
   let query = supabase
     .from("renewals")

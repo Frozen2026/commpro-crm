@@ -1,4 +1,4 @@
-import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 
 export type UserContext = {
@@ -8,7 +8,7 @@ export type UserContext = {
 };
 
 export async function getUserContext(): Promise<UserContext> {
-  const supabase = await createServerSupabaseClient();
+  const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();

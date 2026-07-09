@@ -1,5 +1,5 @@
 import { getUserContext } from "@/lib/account-context";
-import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { createClient } from "@/lib/supabase/server";
 
 type ClientRow = {
   id: string;
@@ -27,7 +27,7 @@ export default async function CoiRequestPage({
   const selectedClientId = (params.client_id ?? "").trim();
 
   const context = await getUserContext();
-  const supabase = await createServerSupabaseClient();
+  const supabase = await createClient();
 
   let clients: ClientRow[] = [];
   if (companyName) {

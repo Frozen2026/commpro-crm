@@ -1,3 +1,8 @@
+"use client";
+
+import type { FormEvent } from "react";
+
+import { createClient as createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { createClient, updateClient } from "@/app/(app)/clients/actions";
 
 type ClientFormValues = {
@@ -16,8 +21,39 @@ type ClientFormValues = {
 export function ClientForm({ values }: { values?: ClientFormValues }) {
   const action = values?.id ? updateClient : createClient;
 
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    const supabase = createSupabaseBrowserClient();
+    const {
+      data: { session },
+      error,
+    } = await supabase.auth.getSession();
+
+    if (error) {
+      event.preventDefault();
+      console.error("[clients.form] Failed to fetch auth session before submit", {
+        message: error.message,
+        name: error.name,
+        status: (error as { status?: number }).status,
+      });
+      return;
+    }
+
+    if (!session) {
+      event.preventDefault();
+      console.error("[clients.form] No auth session found on submit", {
+        userId: null,
+      });
+      return;
+    }
+
+    console.log("[clients.form] Auth session present on submit:", Boolean(session), {
+      userId: session?.user?.id ?? null,
+      expiresAt: session?.expires_at ?? null,
+    });
+  }
+
   return (
-    <form action={action} className="space-y-4 rounded-xl border border-[var(--border)] bg-white p-6 shadow-sm">
+    <form action={action} onSubmit={handleSubmit} className="space-y-4 rounded-xl border border-[var(--border)] bg-white p-6 shadow-sm">
       {values?.id ? <input type="hidden" name="id" value={values.id} /> : null}
 
       <div className="grid gap-4 md:grid-cols-2">

@@ -1,5 +1,5 @@
 import { getUserContext } from "@/lib/account-context";
-import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { createClient } from "@/lib/supabase/server";
 
 type CommissionRow = {
   id: string;
@@ -24,7 +24,7 @@ const paidStatusClasses: Record<string, string> = {
 
 export default async function CommissionsPage() {
   const context = await getUserContext();
-  const supabase = await createServerSupabaseClient();
+  const supabase = await createClient();
 
   const { data } = await supabase
     .from("commissions")

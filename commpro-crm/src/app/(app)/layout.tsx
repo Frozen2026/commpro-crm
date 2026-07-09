@@ -2,12 +2,12 @@ import { redirect } from "next/navigation";
 
 import { SidebarNav } from "@/components/sidebar-nav";
 import { SignOutButton } from "@/components/sign-out-button";
-import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { createClient } from "@/lib/supabase/server";
 
 export default async function AppLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
-  const supabase = await createServerSupabaseClient();
+  const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();

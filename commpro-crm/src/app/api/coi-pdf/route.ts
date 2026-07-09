@@ -2,7 +2,7 @@ import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import { NextResponse } from "next/server";
 
 import { getUserContext } from "@/lib/account-context";
-import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { createClient } from "@/lib/supabase/server";
 
 export async function GET(request: Request) {
   const url = new URL(request.url);
@@ -18,7 +18,7 @@ export async function GET(request: Request) {
   }
 
   const context = await getUserContext();
-  const supabase = await createServerSupabaseClient();
+  const supabase = await createClient();
 
   const { data: policies, error } = await supabase
     .from("policies")

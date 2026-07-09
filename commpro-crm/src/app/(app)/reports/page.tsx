@@ -1,9 +1,9 @@
 import { getUserContext } from "@/lib/account-context";
-import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { createClient } from "@/lib/supabase/server";
 
 export default async function ReportsPage() {
   const context = await getUserContext();
-  const supabase = await createServerSupabaseClient();
+  const supabase = await createClient();
 
   const [policiesResult, renewalsResult, claimsResult, commissionsResult] = await Promise.all([
     supabase

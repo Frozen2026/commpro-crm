@@ -2,7 +2,7 @@
 
 import { type FormEvent, useMemo, useState } from "react";
 
-import { createBrowserSupabaseClient } from "@/lib/supabase/client";
+import { createClient } from "@/lib/supabase/client";
 
 type ScoreRow = {
   id: string;
@@ -35,7 +35,7 @@ export function CsaManagerClient({
   const [reason, setReason] = useState("Unsafe Driving");
   const [loading, setLoading] = useState(false);
   const [response, setResponse] = useState<string>("");
-  const supabase = useMemo(() => createBrowserSupabaseClient(), []);
+  const supabase = useMemo(() => createClient(), []);
 
   const callLeadGenerator = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();

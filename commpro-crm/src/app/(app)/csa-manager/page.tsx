@@ -1,6 +1,6 @@
 import { CsaManagerClient } from "@/app/(app)/csa-manager/csa-manager-client";
 import { getUserContext } from "@/lib/account-context";
-import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { createClient } from "@/lib/supabase/server";
 
 export default async function CsaManagerPage({
   searchParams,
@@ -10,7 +10,7 @@ export default async function CsaManagerPage({
   const params = await searchParams;
   const dotNumber = (params.dot ?? "").trim();
   const context = await getUserContext();
-  const supabase = await createServerSupabaseClient();
+  const supabase = await createClient();
 
   const [{ data: alertsData }, { data: scoreData }] = await Promise.all([
     supabase

@@ -1,8 +1,9 @@
 import Link from "next/link";
 
 import { deleteClient } from "@/app/(app)/clients/actions";
+import { ErrorConsoleLogger } from "@/app/(app)/clients/new/error-console-logger";
 import { getUserContext } from "@/lib/account-context";
-import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { createClient } from "@/lib/supabase/server";
 
 type ClientRow = {
   id: string;
@@ -16,7 +17,7 @@ type ClientRow = {
 
 export default async function ClientsPage() {
   const context = await getUserContext();
-  const supabase = await createServerSupabaseClient();
+  const supabase = await createClient();
 
   let query = supabase
     .from("clients")
@@ -25,7 +26,24 @@ export default async function ClientsPage() {
 
   query = context.agencyId ? query.eq("agency_id", context.agencyId) : query.eq("owner_id", context.userId);
 
-  const { data } = await query;
+  const { data, error } = await query;
+
+  const supabaseError = error
+    ? {
+        message: error.message,
+        code: error.code,
+        details: error.details,
+        hint: error.hint,
+      }
+    : null;
+
+  if (error) {
+    console.error("[clients.page] Supabase select failed", {
+      ...supabaseError,
+      userId: context.userId,
+      agencyId: context.agencyId,
+    });
+  }
 
   const clients = (data ?? []) as ClientRow[];
 
@@ -42,6 +60,7 @@ export default async function ClientsPage() {
       </div>
 
       <div className="overflow-x-auto rounded-xl border border-[var(--border)] bg-white">
+        <ErrorConsoleLogger error={error?.message ?? null} supabaseError={supabaseError} />
         <table className="min-w-full text-sm">
           <thead className="bg-slate-50 text-left text-slate-600">
             <tr>

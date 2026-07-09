@@ -5,10 +5,10 @@ import { redirect } from "next/navigation";
 
 import { getUserContext } from "@/lib/account-context";
 import { getNullableNumber, getNullableString, getString } from "@/lib/form-utils";
-import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { createClient } from "@/lib/supabase/server";
 
 export async function createPolicy(formData: FormData) {
-  const supabase = await createServerSupabaseClient();
+  const supabase = await createClient();
   const context = await getUserContext();
 
   if (!context.agencyId) {
@@ -39,7 +39,7 @@ export async function createPolicy(formData: FormData) {
 }
 
 export async function updatePolicy(formData: FormData) {
-  const supabase = await createServerSupabaseClient();
+  const supabase = await createClient();
   const context = await getUserContext();
   const id = getString(formData, "id");
 
@@ -70,7 +70,7 @@ export async function updatePolicy(formData: FormData) {
 }
 
 export async function deletePolicy(formData: FormData) {
-  const supabase = await createServerSupabaseClient();
+  const supabase = await createClient();
   const context = await getUserContext();
   const id = getString(formData, "id");
 

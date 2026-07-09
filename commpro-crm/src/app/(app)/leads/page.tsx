@@ -1,7 +1,7 @@
 import Link from "next/link";
 
 import { getUserContext } from "@/lib/account-context";
-import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { createClient } from "@/lib/supabase/server";
 
 type LeadRow = {
   id: string;
@@ -14,7 +14,7 @@ type LeadRow = {
 
 export default async function LeadsPage() {
   const context = await getUserContext();
-  const supabase = await createServerSupabaseClient();
+  const supabase = await createClient();
 
   const { data } = await supabase
     .from("leads")

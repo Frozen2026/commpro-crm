@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { getUserContext } from "@/lib/account-context";
-import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { createClient } from "@/lib/supabase/server";
 
 type ChatMessage = {
   role: "user" | "assistant";
@@ -58,7 +58,7 @@ export async function sendChatMessage(formData: FormData) {
   }
 
   const context = await getUserContext();
-  const supabase = await createServerSupabaseClient();
+  const supabase = await createClient();
 
   const {
     data: { user },

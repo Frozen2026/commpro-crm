@@ -13,7 +13,3 @@ export const supabaseUrl = publicSupabaseUrl;
 export const supabaseAnonKey = publicSupabaseAnonKey;
 
 export const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY ?? "";
-
-if (typeof window === "undefined" && !supabaseServiceRoleKey) {
-  throw new Error("Missing environment variable: SUPABASE_SERVICE_ROLE_KEY");
-}

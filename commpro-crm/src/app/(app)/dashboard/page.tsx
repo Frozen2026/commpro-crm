@@ -1,9 +1,9 @@
 import { getUserContext } from "@/lib/account-context";
-import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { createClient } from "@/lib/supabase/server";
 
 export default async function DashboardPage() {
   const context = await getUserContext();
-  const supabase = await createServerSupabaseClient();
+  const supabase = await createClient();
 
   const [leadsCount, clientsCount, activePoliciesCount, premiumRows] = await Promise.all([
     supabase

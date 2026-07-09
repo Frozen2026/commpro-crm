@@ -1,12 +1,34 @@
 import Link from "next/link";
 
 import { ClientForm } from "@/app/(app)/clients/client-form";
+import { ErrorConsoleLogger } from "@/app/(app)/clients/new/error-console-logger";
 
 type NewClientPageProps = {
   searchParams?: Promise<{
     error?: string;
+    supabase_error?: string;
   }>;
 };
+
+function getSupabaseError(supabaseError: string | undefined) {
+  if (!supabaseError) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(decodeURIComponent(supabaseError)) as {
+      message: string;
+      code?: string;
+      details?: string;
+      hint?: string;
+      status?: number;
+    };
+  } catch {
+    return {
+      message: supabaseError,
+    };
+  }
+}
 
 function getErrorMessage(error: string | undefined) {
   if (!error) {
@@ -43,6 +65,7 @@ function getErrorMessage(error: string | undefined) {
 export default async function NewClientPage({ searchParams }: NewClientPageProps) {
   const params = searchParams ? await searchParams : undefined;
   const errorMessage = getErrorMessage(params?.error);
+  const supabaseError = getSupabaseError(params?.supabase_error);
 
   return (
     <section className="space-y-4">
@@ -55,6 +78,7 @@ export default async function NewClientPage({ searchParams }: NewClientPageProps
       {errorMessage ? (
         <p className="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{errorMessage}</p>
       ) : null}
+      <ErrorConsoleLogger error={errorMessage} supabaseError={supabaseError} />
       <ClientForm />
     </section>
   );

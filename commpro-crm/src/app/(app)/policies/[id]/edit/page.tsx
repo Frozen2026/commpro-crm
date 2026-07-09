@@ -3,12 +3,12 @@ import { notFound } from "next/navigation";
 
 import { PolicyForm } from "@/app/(app)/policies/policy-form";
 import { getUserContext } from "@/lib/account-context";
-import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { createClient } from "@/lib/supabase/server";
 
 export default async function EditPolicyPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const context = await getUserContext();
-  const supabase = await createServerSupabaseClient();
+  const supabase = await createClient();
 
   const [{ data: policy }, { data: clientsData }, { data: carriersData }] = await Promise.all([
     supabase

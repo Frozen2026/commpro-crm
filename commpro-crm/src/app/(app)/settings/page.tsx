@@ -1,5 +1,5 @@
 import { getUserContext } from "@/lib/account-context";
-import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { createClient } from "@/lib/supabase/server";
 
 function statusClass(value: boolean) {
   return value ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700";
@@ -7,7 +7,7 @@ function statusClass(value: boolean) {
 
 export default async function SettingsPage() {
   const context = await getUserContext();
-  const supabase = await createServerSupabaseClient();
+  const supabase = await createClient();
 
   const [{ data: agency }, { data: profile }] = await Promise.all([
     context.agencyId

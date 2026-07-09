@@ -1,10 +1,10 @@
 import { placeCallAction, sendSmsAction } from "@/app/(app)/twilio/actions";
 import { getUserContext } from "@/lib/account-context";
-import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { createClient } from "@/lib/supabase/server";
 
 export default async function TwilioPage() {
   const context = await getUserContext();
-  const supabase = await createServerSupabaseClient();
+  const supabase = await createClient();
 
   const [{ data: smsRows }, { data: callRows }] = await Promise.all([
     supabase

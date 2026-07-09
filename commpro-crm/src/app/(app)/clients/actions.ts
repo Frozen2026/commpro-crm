@@ -5,7 +5,50 @@ import { redirect } from "next/navigation";
 
 import { getUserContext } from "@/lib/account-context";
 import { getNullableString, getString } from "@/lib/form-utils";
-import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { supabaseAdmin } from "@/lib/supabase/admin";
+import { createClient as createSupabaseServerClient } from "@/lib/supabase/server";
+
+type SupabaseErrorDetails = {
+  message: string;
+  code?: string;
+  details?: string;
+  hint?: string;
+  status?: number;
+};
+
+function encodeSupabaseErrorForQuery(error: SupabaseErrorDetails) {
+  return encodeURIComponent(JSON.stringify(error));
+}
+
+async function requireAuthenticatedUser(actionName: string) {
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser();
+
+  if (authError) {
+    console.error(`[clients.${actionName}] Failed to validate auth session`, {
+      message: authError.message,
+      code: authError.code,
+      status: authError.status,
+    });
+    redirect(
+      `/clients/new?error=auth-session-invalid&supabase_error=${encodeSupabaseErrorForQuery({
+        message: authError.message,
+        code: authError.code,
+        status: authError.status,
+      })}`,
+    );
+  }
+
+  if (!user) {
+    console.error(`[clients.${actionName}] No authenticated user in session`);
+    redirect("/login");
+  }
+
+  return user;
+}
 
 export async function createClient(formData: FormData) {
   const hasSupabaseUrl = Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL);
@@ -19,25 +62,7 @@ export async function createClient(formData: FormData) {
     redirect("/clients/new?error=supabase-env-missing");
   }
 
-  const supabase = await createServerSupabaseClient();
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser();
-
-  if (authError) {
-    console.error("[clients.createClient] Failed to validate auth session", {
-      message: authError.message,
-      code: authError.code,
-      status: authError.status,
-    });
-    redirect("/clients/new?error=auth-session-invalid");
-  }
-
-  if (!user) {
-    console.error("[clients.createClient] No authenticated user in session");
-    redirect("/login");
-  }
+  await requireAuthenticatedUser("createClient");
 
   const context = await getUserContext();
   const firstName = getString(formData, "first_name");
@@ -50,7 +75,7 @@ export async function createClient(formData: FormData) {
     data: firstAgencyRows,
     error: agenciesError,
     count: agenciesCount,
-  } = await supabase
+  } = await supabaseAdmin
     .from("agencies")
     .select("id", { count: "exact" })
     .limit(1);
@@ -102,16 +127,26 @@ export async function createClient(formData: FormData) {
     zip: getNullableString(formData, "zip"),
   };
 
-  const { error } = await supabase.from("clients").insert(payload);
+  const { error } = await supabaseAdmin.from("clients").insert(payload);
   if (error) {
-    console.error("[clients.createClient] Supabase insert failed", {
+    const supabaseError = {
       message: error.message,
       code: error.code,
       details: error.details,
       hint: error.hint,
+    };
+
+    console.error("[clients.createClient] Supabase insert failed", {
+      rawError: JSON.stringify(error),
+      ...supabaseError,
       payload,
     });
-    redirect(`/clients/new?error=${encodeURIComponent(error.message)}`);
+
+    redirect(
+      `/clients/new?error=${encodeURIComponent(error.message)}&supabase_error=${encodeSupabaseErrorForQuery(
+        supabaseError,
+      )}`,
+    );
   }
 
   revalidatePath("/dashboard");
@@ -120,7 +155,7 @@ export async function createClient(formData: FormData) {
 }
 
 export async function updateClient(formData: FormData) {
-  const supabase = await createServerSupabaseClient();
+  await requireAuthenticatedUser("updateClient");
   const context = await getUserContext();
   const id = getString(formData, "id");
 
@@ -136,7 +171,7 @@ export async function updateClient(formData: FormData) {
     zip: getNullableString(formData, "zip"),
   };
 
-  let query = supabase
+  let query = supabaseAdmin
     .from("clients")
     .update(payload)
     .eq("id", id);
@@ -146,7 +181,18 @@ export async function updateClient(formData: FormData) {
   const { error } = await query;
 
   if (error) {
-    throw new Error(error.message);
+    console.error("[clients.updateClient] Supabase update failed", {
+      rawError: JSON.stringify(error),
+      message: error.message,
+      code: error.code,
+      details: error.details,
+      hint: error.hint,
+      clientId: id,
+      payload,
+      userId: context.userId,
+      agencyId: context.agencyId,
+    });
+    throw new Error(`Supabase update failed: ${error.message}`);
   }
 
   revalidatePath("/dashboard");
@@ -156,11 +202,11 @@ export async function updateClient(formData: FormData) {
 }
 
 export async function deleteClient(formData: FormData) {
-  const supabase = await createServerSupabaseClient();
+  await requireAuthenticatedUser("deleteClient");
   const context = await getUserContext();
   const id = getString(formData, "id");
 
-  let query = supabase
+  let query = supabaseAdmin
     .from("clients")
     .delete()
     .eq("id", id);
@@ -170,7 +216,17 @@ export async function deleteClient(formData: FormData) {
   const { error } = await query;
 
   if (error) {
-    throw new Error(error.message);
+    console.error("[clients.deleteClient] Supabase delete failed", {
+      rawError: JSON.stringify(error),
+      message: error.message,
+      code: error.code,
+      details: error.details,
+      hint: error.hint,
+      clientId: id,
+      userId: context.userId,
+      agencyId: context.agencyId,
+    });
+    throw new Error(`Supabase delete failed: ${error.message}`);
   }
 
   revalidatePath("/dashboard");

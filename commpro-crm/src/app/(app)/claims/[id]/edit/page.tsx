@@ -3,12 +3,12 @@ import { notFound } from "next/navigation";
 
 import { ClaimForm } from "@/app/(app)/claims/claim-form";
 import { getUserContext } from "@/lib/account-context";
-import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { createClient } from "@/lib/supabase/server";
 
 export default async function EditClaimPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const context = await getUserContext();
-  const supabase = await createServerSupabaseClient();
+  const supabase = await createClient();
 
   const [{ data: claim }, { data: policiesData }] = await Promise.all([
     supabase

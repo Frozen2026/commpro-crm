@@ -1,6 +1,6 @@
 import { sendChatMessage } from "@/app/(app)/ai-chatbot/actions";
 import { getUserContext } from "@/lib/account-context";
-import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { createClient } from "@/lib/supabase/server";
 
 type ChatMessage = {
   role: "user" | "assistant";
@@ -10,7 +10,7 @@ type ChatMessage = {
 
 export default async function AiChatbotPage() {
   const context = await getUserContext();
-  const supabase = await createServerSupabaseClient();
+  const supabase = await createClient();
 
   const [{ data: conversation }, { data: kbRows }] = await Promise.all([
     supabase
