@@ -23,7 +23,7 @@ export function ClientForm({ values }: { values?: ClientFormValues }) {
       <div className="grid gap-4 md:grid-cols-2">
         <label className="space-y-1 text-sm">
           <span className="font-medium text-slate-700">First Name</span>
-          <input name="first_name" defaultValue={values?.first_name ?? ""} className="w-full rounded-md border border-[var(--border)] px-3 py-2" />
+          <input name="first_name" required defaultValue={values?.first_name ?? ""} className="w-full rounded-md border border-[var(--border)] px-3 py-2" />
         </label>
         <label className="space-y-1 text-sm">
           <span className="font-medium text-slate-700">Last Name</span>

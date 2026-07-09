@@ -10,6 +10,11 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 export async function createClient(formData: FormData) {
   const supabase = await createServerSupabaseClient();
   const context = await getUserContext();
+  const firstName = getString(formData, "first_name");
+
+  if (!firstName) {
+    throw new Error("First name is required.");
+  }
 
   let agencyId = context.agencyId;
 
@@ -17,11 +22,13 @@ export async function createClient(formData: FormData) {
     const { data: firstAgency } = await supabase
       .from("agencies")
       .select("id")
-      .eq("account_id", context.accountId)
+      .order("created_at", { ascending: true })
       .limit(1)
       .maybeSingle();
 
-    agencyId = firstAgency?.id ? String(firstAgency.id) : null;
+    if (firstAgency?.id) {
+      agencyId = String(firstAgency.id);
+    }
   }
 
   if (!agencyId) {
@@ -31,7 +38,7 @@ export async function createClient(formData: FormData) {
   const payload = {
     agency_id: agencyId,
     owner_id: context.userId,
-    first_name: getNullableString(formData, "first_name"),
+    first_name: firstName,
     last_name: getNullableString(formData, "last_name"),
     business_name: getNullableString(formData, "business_name"),
     email: getNullableString(formData, "email"),
