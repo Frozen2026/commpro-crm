@@ -62,23 +62,21 @@ export async function createClient(formData: FormData) {
     redirect("/clients/new?error=supabase-env-missing");
   }
 
-  await requireAuthenticatedUser("createClient");
+  const authenticatedUser = await requireAuthenticatedUser("createClient");
 
   const context = await getUserContext();
+  const supabase = await createSupabaseServerClient();
   const firstName = getString(formData, "first_name");
 
   if (!firstName) {
     redirect("/clients/new?error=first-name-required");
   }
 
-  const {
-    data: firstAgencyRows,
-    error: agenciesError,
-    count: agenciesCount,
-  } = await supabaseAdmin
+  const { data: agency, error: agenciesError } = await supabase
     .from("agencies")
-    .select("id", { count: "exact" })
-    .limit(1);
+    .select("id")
+    .limit(1)
+    .single();
 
   if (agenciesError) {
     console.error("[clients.createClient] Failed to read agencies table", {
@@ -90,32 +88,16 @@ export async function createClient(formData: FormData) {
     redirect("/clients/new?error=agency-lookup-failed");
   }
 
-  let agencyId = context.agencyId;
-
-  if (!agencyId) {
-    const firstAgency = firstAgencyRows?.[0];
-    if (firstAgency?.id) {
-      agencyId = String(firstAgency.id);
-    }
-  }
-
-  if (!agenciesCount) {
-    console.error("[clients.createClient] Agencies table has no rows");
-    redirect("/clients/new?error=no-agency");
-  }
-
-  if (!agencyId) {
+  if (!agency?.id) {
     console.error("[clients.createClient] Unable to resolve agency_id for insert", {
       userId: context.userId,
       contextAgencyId: context.agencyId,
-      agenciesCount,
+      agency,
     });
     redirect("/clients/new?error=no-agency");
   }
 
-  const payload = {
-    agency_id: agencyId,
-    owner_id: context.userId,
+  const submittedValues = {
     first_name: firstName,
     last_name: getNullableString(formData, "last_name"),
     business_name: getNullableString(formData, "business_name"),
@@ -127,7 +109,22 @@ export async function createClient(formData: FormData) {
     zip: getNullableString(formData, "zip"),
   };
 
-  const { error } = await supabaseAdmin.from("clients").insert(payload);
+  const { error } = await supabase
+    .from("clients")
+    .insert({
+      agency_id: agency.id,
+      account_id: context.accountId,
+      owner_id: authenticatedUser.id,
+      first_name: submittedValues.first_name,
+      last_name: submittedValues.last_name,
+      business_name: submittedValues.business_name,
+      email: submittedValues.email,
+      phone: submittedValues.phone,
+      address: submittedValues.address,
+      city: submittedValues.city,
+      state: submittedValues.state,
+      zip: submittedValues.zip,
+    });
   if (error) {
     const supabaseError = {
       message: error.message,
@@ -139,7 +136,10 @@ export async function createClient(formData: FormData) {
     console.error("[clients.createClient] Supabase insert failed", {
       rawError: JSON.stringify(error),
       ...supabaseError,
-      payload,
+      submittedValues,
+      agencyId: agency.id,
+      accountId: context.accountId,
+      ownerId: authenticatedUser.id,
     });
 
     redirect(
