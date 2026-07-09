@@ -1,4 +1,5 @@
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { redirect } from "next/navigation";
 
 export type UserContext = {
   userId: string;
@@ -13,7 +14,7 @@ export async function getUserContext(): Promise<UserContext> {
   } = await supabase.auth.getUser();
 
   if (!user) {
-    throw new Error("Unauthorized");
+    redirect("/login");
   }
 
   const { data: membership } = await supabase
