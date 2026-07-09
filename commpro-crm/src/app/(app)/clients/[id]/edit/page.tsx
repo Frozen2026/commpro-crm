@@ -10,16 +10,14 @@ export default async function EditClientPage({ params }: { params: Promise<{ id:
   const context = await getUserContext();
   const supabase = await createServerSupabaseClient();
 
-  if (!context.agencyId) {
-    throw new Error("No agency is configured for this account.");
-  }
-
-  const { data: client } = await supabase
+  let query = supabase
     .from("clients")
     .select("id, first_name, last_name, business_name, email, phone, address, city, state, zip")
-    .eq("id", id)
-    .eq("agency_id", context.agencyId)
-    .maybeSingle();
+    .eq("id", id);
+
+  query = context.agencyId ? query.eq("agency_id", context.agencyId) : query.eq("owner_id", context.userId);
+
+  const { data: client } = await query.maybeSingle();
 
   if (!client) {
     notFound();
