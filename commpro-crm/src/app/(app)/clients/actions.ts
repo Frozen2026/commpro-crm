@@ -13,18 +13,21 @@ export async function createClient(formData: FormData) {
   const firstName = getString(formData, "first_name");
 
   if (!firstName) {
-    throw new Error("First name is required.");
+    redirect("/clients/new?error=first-name-required");
   }
 
   let agencyId = context.agencyId;
 
   if (!agencyId) {
-    const { data: firstAgency } = await supabase
+    const { data: firstAgency, error: firstAgencyError } = await supabase
       .from("agencies")
       .select("id")
-      .order("created_at", { ascending: true })
       .limit(1)
       .maybeSingle();
+
+    if (firstAgencyError) {
+      redirect("/clients/new?error=agency-lookup-failed");
+    }
 
     if (firstAgency?.id) {
       agencyId = String(firstAgency.id);
@@ -32,7 +35,7 @@ export async function createClient(formData: FormData) {
   }
 
   if (!agencyId) {
-    throw new Error("No agency is configured for this account.");
+    redirect("/clients/new?error=no-agency");
   }
 
   const payload = {
@@ -51,7 +54,7 @@ export async function createClient(formData: FormData) {
 
   const { error } = await supabase.from("clients").insert(payload);
   if (error) {
-    throw new Error(error.message);
+    redirect(`/clients/new?error=${encodeURIComponent(error.message)}`);
   }
 
   revalidatePath("/dashboard");

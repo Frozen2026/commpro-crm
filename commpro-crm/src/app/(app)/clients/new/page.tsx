@@ -2,7 +2,40 @@ import Link from "next/link";
 
 import { ClientForm } from "@/app/(app)/clients/client-form";
 
-export default function NewClientPage() {
+type NewClientPageProps = {
+  searchParams?: Promise<{
+    error?: string;
+  }>;
+};
+
+function getErrorMessage(error: string | undefined) {
+  if (!error) {
+    return null;
+  }
+
+  if (error === "first-name-required") {
+    return "First name is required.";
+  }
+
+  if (error === "no-agency") {
+    return "No agency record exists yet. Create an agency and try again.";
+  }
+
+  if (error === "agency-lookup-failed") {
+    return "Unable to load agencies right now. Please try again.";
+  }
+
+  try {
+    return decodeURIComponent(error);
+  } catch {
+    return error;
+  }
+}
+
+export default async function NewClientPage({ searchParams }: NewClientPageProps) {
+  const params = searchParams ? await searchParams : undefined;
+  const errorMessage = getErrorMessage(params?.error);
+
   return (
     <section className="space-y-4">
       <div className="flex items-center justify-between">
@@ -11,6 +44,9 @@ export default function NewClientPage() {
           Back to Clients
         </Link>
       </div>
+      {errorMessage ? (
+        <p className="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{errorMessage}</p>
+      ) : null}
       <ClientForm />
     </section>
   );
