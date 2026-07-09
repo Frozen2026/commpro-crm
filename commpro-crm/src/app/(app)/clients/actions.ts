@@ -76,7 +76,7 @@ export async function createClient(formData: FormData) {
     .from("agencies")
     .select("id")
     .limit(1)
-    .single();
+    .maybeSingle();
 
   if (agenciesError) {
     console.error("[clients.createClient] Failed to read agencies table", {
@@ -88,7 +88,33 @@ export async function createClient(formData: FormData) {
     redirect("/clients/new?error=agency-lookup-failed");
   }
 
-  if (!agency?.id) {
+  let agencyId = agency?.id ? String(agency.id) : null;
+
+  if (!agencyId) {
+    const { data: createdAgency, error: createAgencyError } = await supabase
+      .from("agencies")
+      .insert({
+        account_id: context.accountId,
+        name: "CommPro Agency",
+        status: "active",
+      })
+      .select("id")
+      .single();
+
+    if (createAgencyError) {
+      console.error("[clients.createClient] Failed to create default agency", {
+        message: createAgencyError.message,
+        code: createAgencyError.code,
+        details: createAgencyError.details,
+        hint: createAgencyError.hint,
+      });
+      redirect("/clients/new?error=no-agency");
+    }
+
+    agencyId = createdAgency?.id ? String(createdAgency.id) : null;
+  }
+
+  if (!agencyId) {
     console.error("[clients.createClient] Unable to resolve agency_id for insert", {
       userId: context.userId,
       contextAgencyId: context.agencyId,
@@ -112,7 +138,7 @@ export async function createClient(formData: FormData) {
   const { error } = await supabase
     .from("clients")
     .insert({
-      agency_id: agency.id,
+      agency_id: agencyId,
       account_id: context.accountId,
       owner_id: authenticatedUser.id,
       first_name: submittedValues.first_name,
@@ -137,7 +163,7 @@ export async function createClient(formData: FormData) {
       rawError: JSON.stringify(error),
       ...supabaseError,
       submittedValues,
-      agencyId: agency.id,
+      agencyId,
       accountId: context.accountId,
       ownerId: authenticatedUser.id,
     });
