@@ -25,6 +25,14 @@ function getErrorMessage(error: string | undefined) {
     return "Unable to load agencies right now. Please try again.";
   }
 
+  if (error === "auth-session-invalid") {
+    return "Your login session is invalid or expired. Please sign in again.";
+  }
+
+  if (error === "supabase-env-missing") {
+    return "Supabase environment variables are missing on the server.";
+  }
+
   try {
     return decodeURIComponent(error);
   } catch {

@@ -8,7 +8,37 @@ import { getNullableString, getString } from "@/lib/form-utils";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 export async function createClient(formData: FormData) {
+  const hasSupabaseUrl = Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL);
+  const hasSupabaseAnonKey = Boolean(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
+
+  if (!hasSupabaseUrl || !hasSupabaseAnonKey) {
+    console.error("[clients.createClient] Missing Supabase environment variables", {
+      hasSupabaseUrl,
+      hasSupabaseAnonKey,
+    });
+    redirect("/clients/new?error=supabase-env-missing");
+  }
+
   const supabase = await createServerSupabaseClient();
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser();
+
+  if (authError) {
+    console.error("[clients.createClient] Failed to validate auth session", {
+      message: authError.message,
+      code: authError.code,
+      status: authError.status,
+    });
+    redirect("/clients/new?error=auth-session-invalid");
+  }
+
+  if (!user) {
+    console.error("[clients.createClient] No authenticated user in session");
+    redirect("/login");
+  }
+
   const context = await getUserContext();
   const firstName = getString(formData, "first_name");
 
@@ -16,25 +46,45 @@ export async function createClient(formData: FormData) {
     redirect("/clients/new?error=first-name-required");
   }
 
+  const {
+    data: firstAgencyRows,
+    error: agenciesError,
+    count: agenciesCount,
+  } = await supabase
+    .from("agencies")
+    .select("id", { count: "exact" })
+    .limit(1);
+
+  if (agenciesError) {
+    console.error("[clients.createClient] Failed to read agencies table", {
+      message: agenciesError.message,
+      code: agenciesError.code,
+      details: agenciesError.details,
+      hint: agenciesError.hint,
+    });
+    redirect("/clients/new?error=agency-lookup-failed");
+  }
+
   let agencyId = context.agencyId;
 
   if (!agencyId) {
-    const { data: firstAgency, error: firstAgencyError } = await supabase
-      .from("agencies")
-      .select("id")
-      .limit(1)
-      .maybeSingle();
-
-    if (firstAgencyError) {
-      redirect("/clients/new?error=agency-lookup-failed");
-    }
-
+    const firstAgency = firstAgencyRows?.[0];
     if (firstAgency?.id) {
       agencyId = String(firstAgency.id);
     }
   }
 
+  if (!agenciesCount) {
+    console.error("[clients.createClient] Agencies table has no rows");
+    redirect("/clients/new?error=no-agency");
+  }
+
   if (!agencyId) {
+    console.error("[clients.createClient] Unable to resolve agency_id for insert", {
+      userId: context.userId,
+      contextAgencyId: context.agencyId,
+      agenciesCount,
+    });
     redirect("/clients/new?error=no-agency");
   }
 
@@ -54,6 +104,13 @@ export async function createClient(formData: FormData) {
 
   const { error } = await supabase.from("clients").insert(payload);
   if (error) {
+    console.error("[clients.createClient] Supabase insert failed", {
+      message: error.message,
+      code: error.code,
+      details: error.details,
+      hint: error.hint,
+      payload,
+    });
     redirect(`/clients/new?error=${encodeURIComponent(error.message)}`);
   }
 
