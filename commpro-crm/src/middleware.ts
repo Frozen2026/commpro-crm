@@ -6,6 +6,11 @@ const marketingHosts = new Set(['commpro.ai', 'www.commpro.ai'])
 const appHost = 'app.commpro.ai'
 
 function getHost(request: NextRequest) {
+  const urlHost = request.nextUrl.hostname?.toLowerCase()
+  if (urlHost) {
+    return urlHost
+  }
+
   const forwardedHost = request.headers.get('x-forwarded-host')
   const hostHeader = forwardedHost || request.headers.get('host') || ''
   const normalizedHost = hostHeader.split(',')[0]?.trim() || ''
@@ -26,7 +31,7 @@ export function middleware(request: NextRequest) {
       return NextResponse.next()
     }
 
-    if (pathname === '/login') {
+    if (pathname === '/login' || pathname === '/login/') {
       return NextResponse.redirect(new URL('/', request.url))
     }
   }
