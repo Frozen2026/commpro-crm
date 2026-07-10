@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "CommPro.ai",
-  description: "CommPro.ai CRM powered by Supabase",
+  description: "CommPro.ai marketing site and commercial insurance CRM",
 };
 
 export default function RootLayout({
