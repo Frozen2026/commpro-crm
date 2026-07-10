@@ -1,28 +1,32 @@
-import type { NextRequest } from "next/server";
-import { NextResponse } from "next/server";
+import { NextResponse } from 'next/server'
+import type { NextRequest } from 'next/server'
 
-import { updateSession } from "@/lib/supabase/middleware";
+const publicRoutes = ['/', '/login', '/signup']
 
-const publicRoutes = ["/", "/login", "/signup", "/api/public"];
+export function middleware(request: NextRequest) {
+  const { pathname } = request.nextUrl
+  const hostname = request.headers.get('host') || ''
 
-export async function middleware(request: NextRequest) {
-  const { hostname, pathname } = request.nextUrl;
-
-  if (hostname === "app.commpro.ai" && pathname !== "/login") {
-    const loginUrl = request.nextUrl.clone();
-    loginUrl.pathname = "/login";
-    loginUrl.search = "";
-
-    return NextResponse.redirect(loginUrl);
+  // commpro.ai root domain always shows marketing site
+  if (hostname === 'commpro.ai' || hostname === 'www.commpro.ai') {
+    if (pathname === '/') {
+      return NextResponse.next()
+    }
   }
 
+  // app.commpro.ai redirects to login
+  if (hostname === 'app.commpro.ai' && pathname === '/') {
+    return NextResponse.redirect(new URL('/login', request.url))
+  }
+
+  // Allow public routes
   if (publicRoutes.includes(pathname)) {
-    return NextResponse.next();
+    return NextResponse.next()
   }
 
-  return updateSession(request);
+  return NextResponse.next()
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)"],
-};
+  matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'],
+}
