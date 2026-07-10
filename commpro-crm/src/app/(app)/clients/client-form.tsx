@@ -18,8 +18,13 @@ type ClientFormValues = {
   zip?: string | null;
 };
 
-export function ClientForm({ values }: { values?: ClientFormValues }) {
-  const action = values?.id ? updateClient : createClient;
+type ClientFormProps = {
+  values?: ClientFormValues;
+  createAction?: (formData: FormData) => Promise<void>;
+};
+
+export function ClientForm({ values, createAction }: ClientFormProps) {
+  const action = values?.id ? updateClient : (createAction ?? createClient);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     const supabase = createSupabaseBrowserClient();

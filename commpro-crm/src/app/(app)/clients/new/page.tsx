@@ -1,7 +1,9 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 
 import { ClientForm } from "@/app/(app)/clients/client-form";
 import { ErrorConsoleLogger } from "@/app/(app)/clients/new/error-console-logger";
+import { createClient as createServerClient } from "@/lib/supabase/server";
 
 type NewClientPageProps = {
   searchParams?: Promise<{
@@ -63,6 +65,39 @@ function getErrorMessage(error: string | undefined) {
 }
 
 export default async function NewClientPage({ searchParams }: NewClientPageProps) {
+  async function createClient(formData: FormData) {
+    "use server";
+
+    const supabase = await createServerClient();
+
+    const { data: agency } = await supabase
+      .from("agencies")
+      .select("id")
+      .limit(1)
+      .single();
+
+    const { error } = await supabase
+      .from("clients")
+      .insert({
+        agency_id: agency?.id,
+        first_name: formData.get("first_name") as string,
+        last_name: formData.get("last_name") as string,
+        business_name: formData.get("business_name") as string,
+        email: formData.get("email") as string,
+        phone: formData.get("phone") as string,
+        address: formData.get("address") as string,
+        city: formData.get("city") as string,
+        state: formData.get("state") as string,
+        zip: formData.get("zip") as string,
+      });
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    redirect("/clients");
+  }
+
   const params = searchParams ? await searchParams : undefined;
   const errorMessage = getErrorMessage(params?.error);
   const supabaseError = getSupabaseError(params?.supabase_error);
@@ -79,7 +114,7 @@ export default async function NewClientPage({ searchParams }: NewClientPageProps
         <p className="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{errorMessage}</p>
       ) : null}
       <ErrorConsoleLogger error={errorMessage} supabaseError={supabaseError} />
-      <ClientForm />
+      <ClientForm createAction={createClient} />
     </section>
   );
 }
