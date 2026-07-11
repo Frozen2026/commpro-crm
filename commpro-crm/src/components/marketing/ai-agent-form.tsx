@@ -15,20 +15,20 @@ const stepDefs = [
 
 export function AiAgentForm() {
   const [propertyType, setPropertyType] = useState<string>("apartment");
-  const module = PROPERTY_MODULES[propertyType];
+  const activeModule = PROPERTY_MODULES[propertyType];
   const [fields, setFields] = useState<Record<string, string>>(() => ({
-    f_addr: module.defaults.f_addr,
-    f_year: module.defaults.f_year,
-    f_sqft: module.defaults.f_sqft,
-    f_tiv: module.defaults.f_tiv,
+    f_addr: activeModule.defaults.f_addr,
+    f_year: activeModule.defaults.f_year,
+    f_sqft: activeModule.defaults.f_sqft,
+    f_tiv: activeModule.defaults.f_tiv,
     f_const: "joisted_masonry",
-    f_roofyr: module.defaults.f_roofyr,
+    f_roofyr: activeModule.defaults.f_roofyr,
     f_rooftype: "shingle",
     f_losses: "minor",
     f_spk: "full",
-    ...Object.fromEntries(module.dynFields.map((field) => [field.id, field.def ?? field.opts?.[0] ?? ""])),
+    ...Object.fromEntries(activeModule.dynFields.map((field) => [field.id, field.def ?? field.opts?.[0] ?? ""])),
   }));
-  const [coverages, setCoverages] = useState<string[]>(module.defCovs);
+  const [coverages, setCoverages] = useState<string[]>(activeModule.defCovs);
   const [running, setRunning] = useState(false);
   const [stepIndex, setStepIndex] = useState(-1);
   const [result, setResult] = useState<QuoteResult | null>(null);
@@ -36,8 +36,8 @@ export function AiAgentForm() {
   const [, startTransition] = useTransition();
 
   const dynDefaults = useMemo(
-    () => Object.fromEntries(module.dynFields.map((field) => [field.id, field.def ?? field.opts?.[0] ?? ""])),
-    [module],
+    () => Object.fromEntries(activeModule.dynFields.map((field) => [field.id, field.def ?? field.opts?.[0] ?? ""])),
+    [activeModule],
   );
 
   function selectType(nextType: string) {
@@ -79,7 +79,7 @@ export function AiAgentForm() {
 
     const quote = buildDemoQuote({
       propertyType,
-      moduleLabel: module.label,
+      moduleLabel: activeModule.label,
       address: fields.f_addr || "",
       yearBuilt: fields.f_year || "",
       sqft: fields.f_sqft || "",
@@ -91,10 +91,10 @@ export function AiAgentForm() {
       sprinklers: fields.f_spk || "none",
       coverages,
       extras: Object.fromEntries(
-        module.dynFields.map((field) => [field.id.replace(/^f_/, ""), fields[field.id] ?? dynDefaults[field.id] ?? ""]),
+        activeModule.dynFields.map((field) => [field.id.replace(/^f_/, ""), fields[field.id] ?? dynDefaults[field.id] ?? ""]),
       ),
-      rules: module.rules,
-      appetite: module.appetite,
+      rules: activeModule.rules,
+      appetite: activeModule.appetite,
     });
 
     startTransition(() => {
@@ -182,7 +182,7 @@ export function AiAgentForm() {
           <div className="agent-card-hdr">
             <div className="agent-card-title">📋 Get AI Quote Form</div>
             <div className="module-badge" style={{ margin: 0, fontSize: 10 }}>
-              {module.icon} {module.label} Module
+              {activeModule.icon} {activeModule.label} Module
             </div>
           </div>
           <div className="agent-card-body">
@@ -268,7 +268,7 @@ export function AiAgentForm() {
             </div>
 
             <div className="fld2">
-              {module.dynFields.map((field) => (
+              {activeModule.dynFields.map((field) => (
                 <div className="fld" key={field.id}>
                   <label htmlFor={field.id}>{field.lbl}</label>
                   {field.type === "select" ? (
@@ -298,7 +298,7 @@ export function AiAgentForm() {
             <div className="fld">
               <label>Coverage Lines</label>
               <div className="cov-grid">
-                {module.covs.map((cov) => (
+                {activeModule.covs.map((cov) => (
                   <label className="cov-item" key={cov}>
                     <input type="checkbox" checked={coverages.includes(cov)} onChange={() => toggleCoverage(cov)} />
                     {cov}

@@ -99,14 +99,14 @@ function navActive(pathname: string, href: string) {
 
 export function SiteHeader() {
   const pathname = usePathname();
+
+  return <SiteHeaderInner key={pathname} pathname={pathname} />;
+}
+
+function SiteHeaderInner({ pathname }: { pathname: string }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [productsOpen, setProductsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    setMobileOpen(false);
-    setProductsOpen(false);
-  }, [pathname]);
 
   useEffect(() => {
     function onDocClick(event: MouseEvent) {
