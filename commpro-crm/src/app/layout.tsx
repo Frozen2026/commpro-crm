@@ -13,8 +13,11 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "CommPro.ai",
-  description: "CommPro.ai marketing site and commercial insurance CRM",
+  title: "Commercial Pro",
+  description: "AI-powered commercial insurance platform and CRM",
+  icons: {
+    icon: "/favicon.png",
+  },
 };
 
 export default function RootLayout({

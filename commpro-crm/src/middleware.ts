@@ -1,7 +1,23 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
-const publicRoutes = ['/', '/login', '/signup']
+const publicExactRoutes = new Set([
+  '/',
+  '/login',
+  '/signup',
+  '/about',
+  '/ai-agent',
+  '/contact',
+  '/privacy',
+  '/contractors',
+  '/commercial-auto',
+  '/uiia-intermodal',
+  '/bonds',
+  '/services/products',
+])
+
+const publicPrefixes = ['/services/']
+
 const marketingHosts = new Set(['commpro.ai', 'www.commpro.ai'])
 const appHost = 'app.commpro.ai'
 
@@ -15,6 +31,14 @@ function getHost(request: NextRequest) {
   const hostHeader = forwardedHost || request.headers.get('host') || ''
   const normalizedHost = hostHeader.split(',')[0]?.trim() || ''
   return normalizedHost.split(':')[0].toLowerCase()
+}
+
+function isPublicPath(pathname: string) {
+  if (publicExactRoutes.has(pathname)) {
+    return true
+  }
+
+  return publicPrefixes.some((prefix) => pathname === prefix.slice(0, -1) || pathname.startsWith(prefix))
 }
 
 export function middleware(request: NextRequest) {
@@ -42,7 +66,7 @@ export function middleware(request: NextRequest) {
   }
 
   // Allow public routes
-  if (publicRoutes.includes(pathname)) {
+  if (isPublicPath(pathname)) {
     return NextResponse.next()
   }
 
@@ -50,5 +74,5 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'],
+  matcher: ['/((?!_next/static|_next/image|favicon.ico|favicon.png).*)'],
 }
