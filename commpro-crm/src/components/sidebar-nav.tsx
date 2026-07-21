@@ -11,7 +11,7 @@ const navItems = [
   { href: "/renewals", label: "Renewals" },
   { href: "/commissions", label: "Commissions" },
   { href: "/claims", label: "Claims" },
-  { href: "/coi-request", label: "COI Request" },
+  { href: "/coi", label: "COI Request" },
   { href: "/csa-manager", label: "CSA Manager" },
   { href: "/carriers", label: "Carriers" },
   { href: "/ai-chatbot", label: "AI Chatbot" },
