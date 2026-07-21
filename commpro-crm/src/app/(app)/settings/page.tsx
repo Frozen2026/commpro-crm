@@ -39,6 +39,17 @@ export default async function SettingsPage() {
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY &&
       process.env.SUPABASE_SERVICE_ROLE_KEY
   );
+  const opsCronConfigured = Boolean(
+    process.env.OPS_CRON_SECRET?.trim() || process.env.CRON_SECRET?.trim()
+  );
+
+  const { data: lastOpsRun } = await supabase
+    .from("ops_runs")
+    .select("status, started_at, findings_count, repairs_count, summary")
+    .eq("account_id", context.accountId)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
 
   return (
     <section className="space-y-4">
@@ -89,6 +100,26 @@ export default async function SettingsPage() {
                 {twilioConfigured ? "Configured" : "Missing"}
               </span>
             </div>
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-slate-600">Ops Brain Cron</span>
+              <span className={`rounded-full px-2 py-1 text-xs font-medium ${statusClass(opsCronConfigured)}`}>
+                {opsCronConfigured ? "Configured" : "Missing"}
+              </span>
+            </div>
+            <div className="border-t border-[var(--border)] pt-3">
+              <p className="text-slate-600">Last Ops Brain run</p>
+              {lastOpsRun ? (
+                <p className="mt-1 text-xs text-slate-700">
+                  {lastOpsRun.status} · {lastOpsRun.findings_count ?? 0} findings ·{" "}
+                  {lastOpsRun.repairs_count ?? 0} repairs
+                  {lastOpsRun.started_at
+                    ? ` · ${new Date(lastOpsRun.started_at).toLocaleString()}`
+                    : ""}
+                </p>
+              ) : (
+                <p className="mt-1 text-xs text-slate-500">No runs yet — open Ops Brain to scan.</p>
+              )}
+            </div>
           </div>
         </article>
       </div>
@@ -98,6 +129,11 @@ export default async function SettingsPage() {
         <ul className="mt-3 space-y-2 text-sm text-slate-600">
           <li>Set Twilio environment values in your deployment target for outbound SMS and voice.</li>
           <li>Use the Twilio module to place test calls and verify delivery statuses.</li>
+          <li>
+            Apply <code className="text-xs">20260722000000_ops_brain.sql</code>, set{" "}
+            <code className="text-xs">OPS_CRON_SECRET</code>, and schedule{" "}
+            <code className="text-xs">POST /api/ops/tick</code> (Vercel Cron is wired in vercel.json).
+          </li>
           <li>Add role-specific settings controls after permission screens are finalized.</li>
         </ul>
       </article>
