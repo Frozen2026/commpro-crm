@@ -1,6 +1,14 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
+import { generateCoiPdfBytes, pdfBytesToBase64 } from "@/lib/coi/generate-coi-pdf";
+import {
+  findClientsForCoi,
+  loadActivePoliciesForClient,
+  pickConfidentClient,
+  resolveIntakeAccountId,
+  resolveIntakeAgencyId,
+} from "@/lib/coi/lookup-client";
 import { supabaseAnonKey, supabaseServiceRoleKey, supabaseUrl } from "@/lib/supabase/config";
 
 type CoiPayload = {
@@ -58,61 +66,140 @@ export async function POST(request: Request) {
     auth: { persistSession: false, autoRefreshToken: false },
   });
 
-  const intakeAccountId = process.env.COI_INTAKE_ACCOUNT_ID?.trim() || null;
-  const intakeAgencyId = process.env.COI_INTAKE_AGENCY_ID?.trim() || null;
+  const intakeAccountIdEnv = process.env.COI_INTAKE_ACCOUNT_ID?.trim() || null;
+  const intakeAgencyIdEnv = process.env.COI_INTAKE_AGENCY_ID?.trim() || null;
 
-  const { data: leadId, error } = await admin.rpc("submit_website_coi_request", {
-    p_insured_name: insuredName,
-    p_email: email,
-    p_holder_name: holderName,
-    p_contact_name: contactName || null,
-    p_phone: phone || null,
-    p_holder_email: holderEmail || null,
-    p_holder_address: holderAddress || null,
-    p_policy_type: policyType || null,
-    p_needed_by: neededBy || null,
-    p_notes: notes || null,
-    p_account_id: intakeAccountId,
-    p_agency_id: intakeAgencyId,
+  const accountId = await resolveIntakeAccountId(admin, intakeAccountIdEnv);
+  if (!accountId) {
+    return NextResponse.json(
+      { ok: false, error: "Request could not be routed. Please call (973) 307-7007." },
+      { status: 503 },
+    );
+  }
+
+  const agencyId = await resolveIntakeAgencyId(admin, accountId, intakeAgencyIdEnv);
+  if (!agencyId) {
+    return NextResponse.json(
+      { ok: false, error: "Request could not be routed. Please call (973) 307-7007." },
+      { status: 503 },
+    );
+  }
+
+  // Always log a lead for audit / follow-up.
+  const leadResult = await createCoiLead(admin, {
+    accountId,
+    agencyId,
+    insuredName,
+    email,
+    holderName,
+    contactName,
+    phone,
+    holderEmail,
+    holderAddress,
+    policyType,
+    neededBy,
+    notes,
   });
 
-  if (error) {
-    console.error("[public-coi-request] rpc failed", error);
+  // Match CRM client + active policies, then auto-issue PDF when confident.
+  let issueStatus: "issued" | "queued" | "no_policies" | "ambiguous" = "queued";
+  let matchedClient: { id: string; businessName: string | null } | null = null;
+  let policySummaries: Array<{
+    id: string;
+    policyNumber: string | null;
+    carrierName: string | null;
+    lineOfBusiness: string | null;
+  }> = [];
+  let pdfBase64: string | null = null;
+  let pdfFilename: string | null = null;
+  let message = "COI request received. We typically issue same business day.";
 
-    // Fallback for projects that have not applied the RPC migration yet.
-    const fallback = await insertLeadFallback(admin, {
-      insuredName,
-      email,
-      holderName,
-      contactName,
-      phone,
-      holderEmail,
-      holderAddress,
-      policyType,
-      neededBy,
-      notes,
-      intakeAccountId,
-      intakeAgencyId,
-    });
+  try {
+    const candidates = await findClientsForCoi(admin, accountId, { insuredName, email, phone });
+    const client = pickConfidentClient(candidates);
 
-    if (!fallback.ok) {
-      return NextResponse.json(
-        { ok: false, error: fallback.error || "Request could not be saved. Please call (973) 307-7007." },
-        { status: 500 },
-      );
+    if (!client && candidates.length > 1) {
+      issueStatus = "ambiguous";
+      message =
+        "We found multiple matching clients. Your request was saved — our team will confirm and issue the COI shortly.";
+    } else if (!client) {
+      issueStatus = "queued";
+      message =
+        "We could not automatically match this insured in our CRM. Your request was saved — we typically issue same business day.";
+    } else {
+      matchedClient = { id: client.id, businessName: client.business_name };
+      const policies = await loadActivePoliciesForClient(admin, accountId, client.id, policyType || undefined);
+
+      if (!policies.length) {
+        issueStatus = "no_policies";
+        message =
+          "We matched your account but found no active policies. Your request was saved — our team will follow up.";
+      } else {
+        const bytes = await generateCoiPdfBytes({
+          insuredName: client.business_name || insuredName,
+          requesterName: contactName,
+          requesterPhone: phone,
+          requesterEmail: email,
+          certificateHolderName: holderName,
+          certificateHolderAddress: holderAddress,
+          certificateHolderEmail: holderEmail,
+          policies,
+          notes,
+        });
+
+        pdfBase64 = pdfBytesToBase64(bytes);
+        pdfFilename = `coi-${(client.business_name || insuredName).replace(/[^a-z0-9]+/gi, "-").toLowerCase()}-${Date.now()}.pdf`;
+        policySummaries = policies.map((p) => ({
+          id: p.id,
+          policyNumber: p.policy_number,
+          carrierName: p.carrier_name,
+          lineOfBusiness: p.line_of_business,
+        }));
+        issueStatus = "issued";
+        message = "COI generated from your CRM client record and active policies.";
+
+        // Best-effort audit row (table may lack insert grants / storage path requirements).
+        try {
+          await admin.from("coi_certificates").insert({
+            account_id: accountId,
+            agency_id: agencyId,
+            client_id: client.id,
+            policy_ids: policies.map((p) => p.id),
+            certificate_holder_name: holderName,
+            certificate_holder_address: holderAddress || null,
+            pdf_storage_path: `inline/${pdfFilename}`,
+            pdf_url: null,
+            delivery_method: "website_download",
+            sent_to_email: email,
+            generated_by: "public_request",
+          });
+        } catch (auditError) {
+          console.warn("[public-coi-request] coi_certificates insert skipped", auditError);
+        }
+      }
     }
+  } catch (lookupError) {
+    console.error("[public-coi-request] client/policy lookup failed", lookupError);
+    // Lead already saved; keep queued success.
   }
 
   return NextResponse.json({
     ok: true,
-    message: "COI request received. We typically issue same business day.",
-    leadId: leadId ?? null,
+    status: issueStatus,
+    message,
+    leadId: leadResult.leadId,
+    client: matchedClient,
+    policies: policySummaries,
+    pdfBase64,
+    pdfFilename,
   });
 }
 
-async function insertLeadFallback(
-  admin: ReturnType<typeof createClient>,
+async function createCoiLead(
+  admin: SupabaseClient,
   input: {
+    accountId: string;
+    agencyId: string;
     insuredName: string;
     email: string;
     holderName: string;
@@ -123,39 +210,28 @@ async function insertLeadFallback(
     policyType: string;
     neededBy: string;
     notes: string;
-    intakeAccountId: string | null;
-    intakeAgencyId: string | null;
   },
 ) {
-  let accountId = input.intakeAccountId;
-  let agencyId = input.intakeAgencyId;
+  const { data: leadId, error } = await admin.rpc("submit_website_coi_request", {
+    p_insured_name: input.insuredName,
+    p_email: input.email,
+    p_holder_name: input.holderName,
+    p_contact_name: input.contactName || null,
+    p_phone: input.phone || null,
+    p_holder_email: input.holderEmail || null,
+    p_holder_address: input.holderAddress || null,
+    p_policy_type: input.policyType || null,
+    p_needed_by: input.neededBy || null,
+    p_notes: input.notes || null,
+    p_account_id: input.accountId,
+    p_agency_id: input.agencyId,
+  });
 
-  if (!accountId) {
-    const { data: account, error } = await admin
-      .from("accounts")
-      .select("id")
-      .order("created_at", { ascending: true })
-      .limit(1)
-      .maybeSingle();
-    if (error || !account?.id) {
-      return { ok: false as const, error: "Request could not be routed. Please call (973) 307-7007." };
-    }
-    accountId = account.id;
+  if (!error) {
+    return { leadId: (leadId as string | null) ?? null };
   }
 
-  if (!agencyId) {
-    const { data: agency, error } = await admin
-      .from("agencies")
-      .select("id")
-      .eq("account_id", accountId)
-      .order("created_at", { ascending: true })
-      .limit(1)
-      .maybeSingle();
-    if (error || !agency?.id) {
-      return { ok: false as const, error: "Request could not be routed. Please call (973) 307-7007." };
-    }
-    agencyId = agency.id;
-  }
+  console.error("[public-coi-request] rpc failed", error);
 
   const summary = [
     "PUBLIC COI REQUEST",
@@ -171,39 +247,42 @@ async function insertLeadFallback(
     `Additional Instructions: ${input.notes || "N/A"}`,
   ].join("\n");
 
-  const { error: insertError } = await admin.from("leads").insert({
-    account_id: accountId,
-    agency_id: agencyId,
-    first_name: input.contactName || "COI",
-    last_name: input.contactName ? null : "Request",
-    business_name: input.insuredName,
-    email: input.email,
-    phone: input.phone || null,
-    source: "website-coi",
-    stage: "new",
-    line_of_business: input.policyType || "COI Request",
-    ai_notes: summary,
-    external_source: "website-coi",
-    external_id: `${input.email.toLowerCase()}-${Date.now()}`,
-    raw_data: {
-      insuredName: input.insuredName,
-      contactName: input.contactName,
+  const { data: inserted, error: insertError } = await admin
+    .from("leads")
+    .insert({
+      account_id: input.accountId,
+      agency_id: input.agencyId,
+      first_name: input.contactName || "COI",
+      last_name: input.contactName ? null : "Request",
+      business_name: input.insuredName,
       email: input.email,
-      phone: input.phone,
-      holderName: input.holderName,
-      holderEmail: input.holderEmail,
-      holderAddress: input.holderAddress,
-      policyType: input.policyType,
-      neededBy: input.neededBy,
-      notes: input.notes,
-      submittedAt: new Date().toISOString(),
-    },
-  });
+      phone: input.phone || null,
+      source: "website-coi",
+      stage: "new",
+      line_of_business: input.policyType || "COI Request",
+      ai_notes: summary,
+      external_source: "website-coi",
+      external_id: `${input.email.toLowerCase()}-${Date.now()}`,
+      raw_data: {
+        insuredName: input.insuredName,
+        contactName: input.contactName,
+        email: input.email,
+        phone: input.phone,
+        holderName: input.holderName,
+        holderEmail: input.holderEmail,
+        holderAddress: input.holderAddress,
+        policyType: input.policyType,
+        neededBy: input.neededBy,
+        notes: input.notes,
+        submittedAt: new Date().toISOString(),
+      },
+    })
+    .select("id")
+    .maybeSingle();
 
   if (insertError) {
-    console.error("[public-coi-request] fallback insert failed", insertError);
-    return { ok: false as const, error: "Request could not be saved. Please call (973) 307-7007." };
+    console.error("[public-coi-request] lead insert failed", insertError);
   }
 
-  return { ok: true as const };
+  return { leadId: inserted?.id ?? null };
 }

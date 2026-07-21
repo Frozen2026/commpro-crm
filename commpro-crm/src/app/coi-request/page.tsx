@@ -40,8 +40,8 @@ export default function PublicCoiRequestPage() {
           <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--primary)]">Certificates</p>
           <h1 className="text-3xl font-bold tracking-tight text-slate-900 md:text-4xl">Request a COI</h1>
           <p className="text-base leading-relaxed text-slate-600">
-            Tell us who needs the certificate and which coverages to show. Include additional insured language and the
-            job location so we can issue it correctly the first time.
+            Enter the insured business name. We match it to your CRM client record, pull active policies, and generate a
+            downloadable COI when there&apos;s a confident match.
           </p>
           <ul className="space-y-3 text-sm text-slate-700">
             <li>

@@ -3,6 +3,39 @@
 import Link from "next/link";
 import { useState, type FormEvent } from "react";
 
+type SubmitResponse = {
+  ok?: boolean;
+  error?: string;
+  message?: string;
+  status?: "issued" | "queued" | "no_policies" | "ambiguous";
+  client?: { id: string; businessName: string | null } | null;
+  policies?: Array<{
+    id: string;
+    policyNumber: string | null;
+    carrierName: string | null;
+    lineOfBusiness: string | null;
+  }>;
+  pdfBase64?: string | null;
+  pdfFilename?: string | null;
+};
+
+function downloadPdf(base64: string, filename: string) {
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i += 1) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  const blob = new Blob([bytes], { type: "application/pdf" });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(url);
+}
+
 export function PublicCoiRequestForm() {
   const [insuredName, setInsuredName] = useState("");
   const [contactName, setContactName] = useState("");
@@ -14,13 +47,14 @@ export function PublicCoiRequestForm() {
   const [policyType, setPolicyType] = useState("");
   const [neededBy, setNeededBy] = useState("");
   const [notes, setNotes] = useState("");
-  const [success, setSuccess] = useState(false);
+  const [result, setResult] = useState<SubmitResponse | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
     setError("");
+    setResult(null);
 
     if (!insuredName.trim() || !email.trim() || !holderName.trim()) {
       setError("Please fill in insured/business name, your email, and certificate holder name.");
@@ -46,16 +80,18 @@ export function PublicCoiRequestForm() {
         }),
       });
 
-      const data = (await response.json().catch(() => null)) as
-        | { ok?: boolean; error?: string; message?: string }
-        | null;
+      const data = (await response.json().catch(() => null)) as SubmitResponse | null;
 
       if (!response.ok || !data?.ok) {
         setError(data?.error || "Something went wrong. Please call (973) 307-7007.");
         return;
       }
 
-      setSuccess(true);
+      setResult(data);
+
+      if (data.status === "issued" && data.pdfBase64 && data.pdfFilename) {
+        downloadPdf(data.pdfBase64, data.pdfFilename);
+      }
     } catch {
       setError("Network error. Please call (973) 307-7007 or email info@commercialpro.ai.");
     } finally {
@@ -66,26 +102,65 @@ export function PublicCoiRequestForm() {
   const fieldClass =
     "w-full rounded-md border border-[var(--border)] px-3 py-2 text-sm outline-none ring-[var(--primary)] focus:ring-2";
 
-  if (success) {
+  if (result?.ok) {
+    const issued = result.status === "issued" && result.pdfBase64 && result.pdfFilename;
+
     return (
-      <div className="space-y-4 rounded-xl border border-emerald-200 bg-emerald-50 p-6 shadow-sm">
-        <h2 className="text-lg font-semibold text-emerald-900">COI request received</h2>
-        <p className="text-sm text-emerald-800">
-          Thanks — we got your certificate request for <strong>{insuredName}</strong>. We typically issue same business
-          day during business hours.
+      <div
+        className={`space-y-4 rounded-xl border p-6 shadow-sm ${
+          issued ? "border-emerald-200 bg-emerald-50" : "border-amber-200 bg-amber-50"
+        }`}
+      >
+        <h2 className={`text-lg font-semibold ${issued ? "text-emerald-900" : "text-amber-950"}`}>
+          {issued ? "COI generated" : "COI request received"}
+        </h2>
+        <p className={`text-sm ${issued ? "text-emerald-800" : "text-amber-900"}`}>
+          {result.message || "We received your request."}
         </p>
-        <p className="text-sm text-emerald-800">
-          Need it urgently? Call{" "}
-          <a href="tel:9733077007" className="font-semibold underline">
-            (973) 307-7007
-          </a>
-          .
-        </p>
+
+        {result.client?.businessName ? (
+          <p className={`text-sm ${issued ? "text-emerald-800" : "text-amber-900"}`}>
+            Matched client: <strong>{result.client.businessName}</strong>
+          </p>
+        ) : null}
+
+        {result.policies && result.policies.length > 0 ? (
+          <div className={`text-sm ${issued ? "text-emerald-800" : "text-amber-900"}`}>
+            <p className="font-medium">Active policies included:</p>
+            <ul className="mt-1 list-disc space-y-1 pl-5">
+              {result.policies.map((policy) => (
+                <li key={policy.id}>
+                  {policy.policyNumber ?? "No Number"} · {policy.carrierName ?? "Carrier TBD"} ·{" "}
+                  {policy.lineOfBusiness ?? "—"}
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
+
+        {issued ? (
+          <button
+            type="button"
+            className="rounded-md bg-[var(--primary)] px-4 py-2 text-sm font-semibold text-[var(--primary-foreground)]"
+            onClick={() => downloadPdf(result.pdfBase64!, result.pdfFilename!)}
+          >
+            Download COI PDF again
+          </button>
+        ) : (
+          <p className="text-sm text-amber-900">
+            Need it urgently? Call{" "}
+            <a href="tel:9733077007" className="font-semibold underline">
+              (973) 307-7007
+            </a>
+            .
+          </p>
+        )}
+
         <button
           type="button"
-          className="rounded-md bg-[var(--primary)] px-4 py-2 text-sm font-semibold text-[var(--primary-foreground)]"
+          className="block text-sm font-medium text-slate-700 underline"
           onClick={() => {
-            setSuccess(false);
+            setResult(null);
             setInsuredName("");
             setContactName("");
             setEmail("");
@@ -108,7 +183,9 @@ export function PublicCoiRequestForm() {
     <form className="space-y-4 rounded-xl border border-[var(--border)] bg-white p-6 shadow-sm" onSubmit={onSubmit}>
       <div>
         <h2 className="text-lg font-semibold text-slate-900">Request a Certificate of Insurance</h2>
-        <p className="mt-1 text-sm text-slate-600">Same-day turnaround during business hours.</p>
+        <p className="mt-1 text-sm text-slate-600">
+          We’ll match the insured to your CRM client record and generate a COI from active policies when possible.
+        </p>
       </div>
 
       <label className="block space-y-1 text-sm">
@@ -208,7 +285,7 @@ export function PublicCoiRequestForm() {
             value={policyType}
             onChange={(e) => setPolicyType(e.target.value)}
           >
-            <option value="">Select...</option>
+            <option value="">All active policies</option>
             <option>General Liability</option>
             <option>Commercial Auto</option>
             <option>Workers Compensation</option>
@@ -262,7 +339,7 @@ export function PublicCoiRequestForm() {
         disabled={loading}
         className="rounded-md bg-[var(--primary)] px-4 py-2 text-sm font-semibold text-[var(--primary-foreground)] transition hover:opacity-95 disabled:opacity-70"
       >
-        {loading ? "Submitting…" : "Submit COI Request →"}
+        {loading ? "Matching client & generating…" : "Generate COI →"}
       </button>
 
       <p className="text-xs text-slate-500">
