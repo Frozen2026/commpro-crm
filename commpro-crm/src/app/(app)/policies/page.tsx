@@ -36,14 +36,22 @@ export default async function PoliciesPage() {
 
   return (
     <section className="space-y-4">
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-2xl font-bold tracking-tight text-slate-900">Policies</h2>
           <p className="mt-1 text-sm text-slate-600">Track policy lifecycle, carriers, and premium values.</p>
         </div>
-        <Link href="/policies/new" className="rounded-md bg-[#2563eb] px-4 py-2 text-sm font-semibold text-white hover:opacity-95">
-          Add Policy
-        </Link>
+        <div className="flex flex-wrap items-center gap-2">
+          <Link
+            href="/policies/ivans"
+            className="rounded-md border border-[var(--border)] bg-white px-4 py-2 text-sm font-semibold text-slate-800 hover:bg-slate-50"
+          >
+            Import from IVANS
+          </Link>
+          <Link href="/policies/new" className="rounded-md bg-[#2563eb] px-4 py-2 text-sm font-semibold text-white hover:opacity-95">
+            Add Policy
+          </Link>
+        </div>
       </div>
 
       <div className="overflow-x-auto rounded-xl border border-[var(--border)] bg-white">

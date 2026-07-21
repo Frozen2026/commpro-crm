@@ -1,0 +1,4 @@
+business_name,email,phone,address,city,state,zip,carrier_name,policy_number,line_of_business,status,premium,effective_date,expiration_date
+Acme Trucking LLC,ops@acmetrucking.example,5551234567,100 Freight Way,Dallas,TX,75201,Progressive,POL-1001,Commercial Auto,active,12500.00,2026-01-01,2027-01-01
+Bay Harbor Marina,info@bayharbor.example,5559876543,22 Dock St,Tampa,FL,33602,Travelers,POL-2002,Marine,active,8400.50,2025-06-15,2026-06-15
+River City Construction,,5552223333,9 Steel Ave,Nashville,TN,37203,Hartford,POL-3003,General Liability,pending,22000,2026-03-01,2027-03-01
