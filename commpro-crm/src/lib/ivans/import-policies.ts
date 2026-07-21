@@ -1,6 +1,9 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
-
 import type { IvansImportSummary, IvansNormalizedPolicy } from "@/lib/ivans/types";
+
+/* eslint-disable @typescript-eslint/no-explicit-any */
+type DbClient = {
+  from: (table: string) => any;
+};
 
 type ClientRow = {
   id: string;
@@ -62,7 +65,7 @@ function findMatchingClient(
 }
 
 export async function importIvansPolicies(params: {
-  supabase: SupabaseClient;
+  supabase: DbClient;
   accountId: string;
   agencyId: string;
   ownerId?: string;
