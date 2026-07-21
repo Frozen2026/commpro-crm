@@ -7,19 +7,18 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
-function authorized(request: Request) {
+function authorized(request: Request): { ok: true } | { ok: false; reason: "missing_env" | "bad_token" } {
   const secret =
     process.env.OPS_CRON_SECRET?.trim() || process.env.CRON_SECRET?.trim();
-  if (!secret) return false;
+  if (!secret) return { ok: false, reason: "missing_env" };
 
   const header = request.headers.get("authorization") || "";
-  if (header === `Bearer ${secret}`) return true;
+  if (header === `Bearer ${secret}`) return { ok: true };
 
   const url = new URL(request.url);
-  if (url.searchParams.get("secret") === secret) return true;
+  if (url.searchParams.get("secret") === secret) return { ok: true };
 
-  // Vercel Cron sends Authorization: Bearer <CRON_SECRET> when configured
-  return false;
+  return { ok: false, reason: "bad_token" };
 }
 
 /**
@@ -28,8 +27,19 @@ function authorized(request: Request) {
  * Optional body: { mode?: "dry_run"|"apply", accountId?: string }
  */
 export async function POST(request: Request) {
-  if (!authorized(request)) {
-    return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+  const auth = authorized(request);
+  if (!auth.ok) {
+    return NextResponse.json(
+      {
+        ok: false,
+        error: "Unauthorized",
+        hint:
+          auth.reason === "missing_env"
+            ? "Set OPS_CRON_SECRET (or CRON_SECRET) on the Vercel project and redeploy."
+            : "Bearer token does not match OPS_CRON_SECRET / CRON_SECRET.",
+      },
+      { status: 401 },
+    );
   }
 
   let body: { mode?: string; accountId?: string } = {};
