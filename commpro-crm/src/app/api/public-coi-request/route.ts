@@ -111,7 +111,9 @@ export async function POST(request: Request) {
 }
 
 async function insertLeadFallback(
-  admin: ReturnType<typeof createClient>,
+  // Loose typing: service-role client generics vary by supabase-js version.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  admin: { from: (table: string) => any },
   input: {
     insuredName: string;
     email: string;

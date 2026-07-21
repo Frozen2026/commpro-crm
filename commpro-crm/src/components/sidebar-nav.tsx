@@ -15,6 +15,7 @@ const navItems = [
   { href: "/csa-manager", label: "CSA Manager" },
   { href: "/carriers", label: "Carriers" },
   { href: "/ai-chatbot", label: "AI Chatbot" },
+  { href: "/ops", label: "Ops Brain" },
   { href: "/twilio", label: "Twilio SMS/Calling" },
   { href: "/reports", label: "Reports" },
   { href: "/settings", label: "Settings" },
