@@ -131,8 +131,9 @@ export default async function SettingsPage() {
           <li>Use the Twilio module to place test calls and verify delivery statuses.</li>
           <li>
             Apply <code className="text-xs">20260722000000_ops_brain.sql</code>, set{" "}
-            <code className="text-xs">OPS_CRON_SECRET</code>, and schedule{" "}
-            <code className="text-xs">POST /api/ops/tick</code> (Vercel Cron is wired in vercel.json).
+            <code className="text-xs">OPS_CRON_SECRET</code>, and call{" "}
+            <code className="text-xs">POST /api/ops/tick</code> on a schedule (external cron or
+            Vercel Cron on Pro).
           </li>
           <li>Add role-specific settings controls after permission screens are finalized.</li>
         </ul>
