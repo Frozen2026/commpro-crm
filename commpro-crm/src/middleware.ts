@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
-const publicRoutes = ['/', '/login', '/signup']
+const publicRoutes = ['/', '/login', '/signup', '/coi-request']
 const marketingHosts = new Set(['commpro.ai', 'www.commpro.ai'])
 const appHost = 'app.commpro.ai'
 
