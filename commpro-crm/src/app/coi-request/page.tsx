@@ -1,9 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { redirect } from "next/navigation";
 
 import { PublicCoiRequestForm } from "@/components/public-coi-request-form";
-import { createClient } from "@/lib/supabase/server";
 
 export const metadata: Metadata = {
   title: "Request a COI | Commercial Pro",
@@ -11,17 +9,9 @@ export const metadata: Metadata = {
     "Request a certificate of insurance from Commercial Pro. Same-day COI issuance for contractors, fleets, and commercial accounts.",
 };
 
-export default async function PublicCoiRequestPage() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+export const dynamic = "force-static";
 
-  // Logged-in CRM users keep the PDF generator workflow.
-  if (user) {
-    redirect("/coi");
-  }
-
+export default function PublicCoiRequestPage() {
   return (
     <div className="min-h-screen bg-[var(--background)]">
       <header className="border-b border-[var(--border)] bg-white">
@@ -66,6 +56,12 @@ export default async function PublicCoiRequestPage() {
               wording · job/site · coverages required
             </li>
           </ul>
+          <p className="text-sm text-slate-500">
+            Already signed in to the CRM? Open{" "}
+            <Link href="/coi" className="font-medium text-[var(--primary)] hover:underline">
+              COI generator →
+            </Link>
+          </p>
         </div>
 
         <PublicCoiRequestForm />
