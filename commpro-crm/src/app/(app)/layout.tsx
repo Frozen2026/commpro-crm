@@ -4,13 +4,28 @@ import { SidebarNav } from "@/components/sidebar-nav";
 import { SignOutButton } from "@/components/sign-out-button";
 import { createClient } from "@/lib/supabase/server";
 
+const AUTH_TIMEOUT_MS = 4000;
+
+async function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T | null> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<null>((resolve) => {
+        timer = setTimeout(() => resolve(null), ms);
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
 export default async function AppLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const result = await withTimeout(supabase.auth.getUser(), AUTH_TIMEOUT_MS);
+  const user = result?.data.user ?? null;
 
   if (!user) {
     redirect("/login");
