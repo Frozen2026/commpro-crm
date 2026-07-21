@@ -16,6 +16,8 @@ type CoiPayload = {
   notes?: string;
 };
 
+type PublicCoiSupabaseClient = Pick<ReturnType<typeof createClient>, "from">;
+
 function trim(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
 }
@@ -111,7 +113,7 @@ export async function POST(request: Request) {
 }
 
 async function insertLeadFallback(
-  admin: ReturnType<typeof createClient>,
+  admin: PublicCoiSupabaseClient,
   input: {
     insuredName: string;
     email: string;
