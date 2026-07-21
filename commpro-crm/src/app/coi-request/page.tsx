@@ -9,7 +9,9 @@ export const metadata: Metadata = {
     "Request a certificate of insurance from Commercial Pro. Same-day COI issuance for contractors, fleets, and commercial accounts.",
 };
 
-export const dynamic = "force-static";
+// Avoid stale prerender/CDN copies of the form client bundle after deploys.
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 export default function PublicCoiRequestPage() {
   return (
