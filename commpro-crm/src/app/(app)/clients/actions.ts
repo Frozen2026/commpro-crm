@@ -20,6 +20,12 @@ function encodeSupabaseErrorForQuery(error: SupabaseErrorDetails) {
   return encodeURIComponent(JSON.stringify(error));
 }
 
+function isMissingTableError(message?: string | null) {
+  if (!message) return false;
+  const m = message.toLowerCase();
+  return m.includes("schema cache") || m.includes("could not find the table");
+}
+
 async function requireAuthenticatedUser(actionName: string) {
   const supabase = await createSupabaseServerClient();
   const {
@@ -51,74 +57,96 @@ async function requireAuthenticatedUser(actionName: string) {
 }
 
 /**
- * Admins/owners should never be blocked by a missing agency row.
- * Resolves (or creates) account + agency via service role so RLS cannot stop client CRUD.
+ * Resolve account_id without touching public.accounts.
+ * Production PostgREST often does not expose MakerKit's accounts table
+ * ("Could not find the table 'public.accounts' in the schema cache").
  */
-async function ensureAccountAndAgency(userId: string, preferredAccountId: string, preferredAgencyId: string | null) {
-  const admin = getSupabaseAdmin();
-
-  let accountId = preferredAccountId;
-
-  const { data: membership } = await admin
-    .from("accounts_memberships")
-    .select("account_id")
-    .eq("user_id", userId)
-    .limit(1)
-    .maybeSingle();
-
-  if (membership?.account_id) {
-    accountId = String(membership.account_id);
-  } else {
-    const { data: existingAccount } = await admin
-      .from("accounts")
-      .select("id")
-      .eq("id", accountId)
+async function resolveAccountId(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  admin: { from: (table: string) => any },
+  userId: string,
+  preferredAccountId: string,
+): Promise<string> {
+  // 1) Memberships (MakerKit) when exposed
+  {
+    const { data, error } = await admin
+      .from("accounts_memberships")
+      .select("account_id")
+      .eq("user_id", userId)
+      .limit(1)
       .maybeSingle();
-
-    if (!existingAccount?.id) {
-      const { data: createdAccount, error: accountError } = await admin
-        .from("accounts")
-        .insert({
-          name: "CommPro Account",
-          primary_owner_user_id: userId,
-          is_personal_account: false,
-        })
-        .select("id")
-        .single();
-
-      if (accountError || !createdAccount?.id) {
-        // Fallback: use any existing account in the system (common on admin bootstraps)
-        const { data: anyAccount } = await admin
-          .from("accounts")
-          .select("id")
-          .limit(1)
-          .maybeSingle();
-
-        if (!anyAccount?.id) {
-          throw new Error(
-            accountError?.message || "Unable to resolve or create an account for client management.",
-          );
-        }
-        accountId = String(anyAccount.id);
-      } else {
-        accountId = String(createdAccount.id);
-      }
-
-      // Best-effort membership so future context resolves cleanly
-      await admin.from("accounts_memberships").upsert(
-        {
-          user_id: userId,
-          account_id: accountId,
-          account_role: "owner",
-        },
-        { onConflict: "user_id,account_id" },
-      ).then(({ error }) => {
-        if (error) {
-          console.warn("[clients.ensureAccountAndAgency] membership upsert skipped", error.message);
-        }
-      });
+    if (!error && data?.account_id) {
+      return String(data.account_id);
+    }
+    if (error && !isMissingTableError(error.message)) {
+      console.warn("[clients.resolveAccountId] memberships lookup", error.message);
     }
   }
+
+  // 2) Agent profile
+  {
+    const { data, error } = await admin
+      .from("agent_profiles")
+      .select("account_id")
+      .eq("id", userId)
+      .maybeSingle();
+    if (!error && data?.account_id) {
+      return String(data.account_id);
+    }
+  }
+
+  // 3) Preferred id if already used by agencies/clients/leads
+  if (preferredAccountId) {
+    for (const table of ["agencies", "clients", "leads"] as const) {
+      const { data, error } = await admin
+        .from(table)
+        .select("id")
+        .eq("account_id", preferredAccountId)
+        .limit(1)
+        .maybeSingle();
+      if (!error && data?.id) {
+        return preferredAccountId;
+      }
+    }
+  }
+
+  // 4) Explicit env bootstrap (same pattern as COI intake)
+  const envAccount =
+    process.env.DEFAULT_ACCOUNT_ID?.trim() ||
+    process.env.COI_INTAKE_ACCOUNT_ID?.trim() ||
+    "";
+  if (envAccount) {
+    return envAccount;
+  }
+
+  // 5) Borrow any existing agency/client account in the project
+  for (const table of ["agencies", "clients", "leads"] as const) {
+    const { data, error } = await admin
+      .from(table)
+      .select("account_id")
+      .not("account_id", "is", null)
+      .limit(1)
+      .maybeSingle();
+    if (!error && data?.account_id) {
+      return String(data.account_id);
+    }
+  }
+
+  throw new Error(
+    "Unable to resolve account_id. Set DEFAULT_ACCOUNT_ID (or COI_INTAKE_ACCOUNT_ID) in the environment.",
+  );
+}
+
+/**
+ * Resolve or create an agency. Never queries public.accounts.
+ */
+async function ensureAccountAndAgency(
+  userId: string,
+  preferredAccountId: string,
+  preferredAgencyId: string | null,
+) {
+  const admin = getSupabaseAdmin();
+  const accountId = await resolveAccountId(admin, userId, preferredAccountId);
 
   let agencyId = preferredAgencyId;
 
@@ -144,24 +172,53 @@ async function ensureAccountAndAgency(userId: string, preferredAccountId: string
     if (existingAgency?.id) {
       agencyId = String(existingAgency.id);
     } else {
-      const { data: createdAgency, error: agencyError } = await admin
-        .from("agencies")
-        .insert({
-          account_id: accountId,
-          name: "Default Agency",
-          status: "active",
-        })
-        .select("id")
-        .single();
+      // Env override for agency if create is blocked
+      const envAgency =
+        process.env.DEFAULT_AGENCY_ID?.trim() ||
+        process.env.COI_INTAKE_AGENCY_ID?.trim() ||
+        "";
 
-      if (agencyError || !createdAgency?.id) {
-        throw new Error(agencyError?.message || "Unable to create a default agency for this account.");
+      if (envAgency) {
+        agencyId = envAgency;
+      } else {
+        const { data: createdAgency, error: agencyError } = await admin
+          .from("agencies")
+          .insert({
+            account_id: accountId,
+            name: "Default Agency",
+            status: "active",
+          })
+          .select("id")
+          .single();
+
+        if (agencyError || !createdAgency?.id) {
+          // Last resort: any agency in the project
+          const { data: anyAgency } = await admin
+            .from("agencies")
+            .select("id, account_id")
+            .limit(1)
+            .maybeSingle();
+
+          if (anyAgency?.id) {
+            return {
+              accountId: anyAgency.account_id
+                ? String(anyAgency.account_id)
+                : accountId,
+              agencyId: String(anyAgency.id),
+            };
+          }
+
+          throw new Error(
+            agencyError?.message ||
+              "Unable to create a default agency. Set DEFAULT_AGENCY_ID in the environment.",
+          );
+        }
+        agencyId = String(createdAgency.id);
       }
-      agencyId = String(createdAgency.id);
     }
   }
 
-  // Keep agent_profiles in sync when present (non-blocking)
+  // Best-effort profile sync — ignore missing-table / RLS noise
   const { error: profileError } = await admin.from("agent_profiles").upsert(
     {
       id: userId,
@@ -170,8 +227,11 @@ async function ensureAccountAndAgency(userId: string, preferredAccountId: string
     },
     { onConflict: "id" },
   );
-  if (profileError) {
-    console.warn("[clients.ensureAccountAndAgency] agent_profiles upsert skipped", profileError.message);
+  if (profileError && !isMissingTableError(profileError.message)) {
+    console.warn(
+      "[clients.ensureAccountAndAgency] agent_profiles upsert skipped",
+      profileError.message,
+    );
   }
 
   return { accountId, agencyId };
@@ -280,7 +340,7 @@ export async function updateClient(formData: FormData) {
   const id = getString(formData, "id");
   const admin = getSupabaseAdmin();
 
-  const { accountId, agencyId } = await ensureAccountAndAgency(
+  const { accountId } = await ensureAccountAndAgency(
     authenticatedUser.id,
     context.accountId,
     context.agencyId,
@@ -309,12 +369,7 @@ export async function updateClient(formData: FormData) {
       rawError: JSON.stringify(error),
       message: error.message,
       code: error.code,
-      details: error.details,
-      hint: error.hint,
       clientId: id,
-      payload,
-      userId: context.userId,
-      agencyId,
       accountId,
     });
     throw new Error(`Supabase update failed: ${error.message}`);
@@ -348,11 +403,7 @@ export async function deleteClient(formData: FormData) {
     console.error("[clients.deleteClient] Supabase delete failed", {
       rawError: JSON.stringify(error),
       message: error.message,
-      code: error.code,
-      details: error.details,
-      hint: error.hint,
       clientId: id,
-      userId: context.userId,
       accountId,
     });
     throw new Error(`Supabase delete failed: ${error.message}`);
