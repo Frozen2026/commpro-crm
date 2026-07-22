@@ -16,7 +16,7 @@ function getErrorMessage(error: string | undefined) {
   }
 
   if (error === "agency-not-found" || error === "no-agency") {
-    return "Could not prepare your workspace automatically. Please try again — admins do not need to create an agency first.";
+    return "Could not prepare your workspace automatically. Please try again.";
   }
 
   if (error === "first-name-required") {
@@ -53,6 +53,11 @@ export default async function NewClientPage({ searchParams }: NewClientPageProps
   const params = searchParams ? await searchParams : undefined;
   const errorMessage = getErrorMessage(params?.error);
   const supabaseError = parseSupabaseError(params?.supabase_error);
+  const needsSqlSetup =
+    Boolean(errorMessage?.toLowerCase().includes("sql")) ||
+    Boolean(errorMessage?.toLowerCase().includes("account_id")) ||
+    Boolean(errorMessage?.toLowerCase().includes("schema cache")) ||
+    Boolean(errorMessage?.toLowerCase().includes("create_client_for_user"));
 
   return (
     <section className="mx-auto max-w-3xl space-y-6">
@@ -71,9 +76,34 @@ export default async function NewClientPage({ searchParams }: NewClientPageProps
       </div>
 
       {errorMessage ? (
-        <p className="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
-          {errorMessage}
-        </p>
+        <div className="space-y-3 rounded-md border border-rose-200 bg-rose-50 px-3 py-3 text-sm text-rose-800">
+          <p>{errorMessage}</p>
+          {needsSqlSetup ? (
+            <div className="rounded border border-rose-200 bg-white/70 p-3 text-slate-800">
+              <p className="font-semibold">One-time database setup</p>
+              <ol className="mt-2 list-decimal space-y-1 pl-5">
+                <li>Open your Supabase project → SQL Editor</li>
+                <li>
+                  Paste and run the full contents of{" "}
+                  <code className="text-xs">20260722020000_create_client_for_user.sql</code>
+                </li>
+                <li>Confirm the notice says &quot;Workspace ready&quot;</li>
+                <li>Return here and create the client again</li>
+              </ol>
+              <p className="mt-2 text-xs text-slate-600">
+                Raw file:{" "}
+                <a
+                  className="font-medium text-[var(--primary)] underline"
+                  href="https://raw.githubusercontent.com/Frozen2026/commpro-crm/main/apps/web/supabase/migrations/20260722020000_create_client_for_user.sql"
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  open SQL on GitHub
+                </a>
+              </p>
+            </div>
+          ) : null}
+        </div>
       ) : null}
 
       <ClientForm />

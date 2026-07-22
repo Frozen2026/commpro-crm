@@ -285,31 +285,10 @@ export async function createClient(formData: FormData) {
   }
 
   const authenticatedUser = await requireAuthenticatedUser("createClient");
-  const context = await getUserContext();
   const firstName = getString(formData, "first_name");
 
   if (!firstName) {
     redirect("/clients/new?error=first-name-required");
-  }
-
-  let accountId = context.accountId;
-  let agencyId = context.agencyId;
-
-  try {
-    const resolved = await ensureAccountAndAgency(
-      authenticatedUser.id,
-      context.accountId,
-      context.agencyId,
-    );
-    accountId = resolved.accountId;
-    agencyId = resolved.agencyId;
-  } catch (err) {
-    console.error("[clients.createClient] Failed to ensure account/agency", err);
-    redirect(
-      `/clients/new?error=${encodeURIComponent(
-        err instanceof Error ? err.message : "Unable to prepare account for client create.",
-      )}`,
-    );
   }
 
   const submittedValues = {
@@ -325,6 +304,67 @@ export async function createClient(formData: FormData) {
   };
 
   const admin = getSupabaseAdmin();
+
+  // Preferred: single SQL RPC creates workspace + client (no REST dependency on accounts)
+  {
+    const { data, error } = await admin.rpc("create_client_for_user", {
+      p_user_id: authenticatedUser.id,
+      p_first_name: submittedValues.first_name,
+      p_last_name: submittedValues.last_name,
+      p_business_name: submittedValues.business_name,
+      p_email: submittedValues.email,
+      p_phone: submittedValues.phone,
+      p_address: submittedValues.address,
+      p_city: submittedValues.city,
+      p_state: submittedValues.state,
+      p_zip: submittedValues.zip,
+    });
+
+    if (!error && data) {
+      revalidatePath("/dashboard");
+      revalidatePath("/clients");
+      redirect("/clients");
+    }
+
+    if (error) {
+      console.warn("[clients.createClient] create_client_for_user RPC failed", error.message);
+      // Fall through to legacy path if RPC not installed yet
+      if (!error.message.toLowerCase().includes("schema cache") &&
+          !error.message.toLowerCase().includes("could not find the function")) {
+        redirect(
+          `/clients/new?error=${encodeURIComponent(error.message)}&supabase_error=${encodeSupabaseErrorForQuery({
+            message: error.message,
+            code: error.code,
+            details: error.details,
+            hint: error.hint,
+          })}`,
+        );
+      }
+    }
+  }
+
+  // Legacy fallback (pre-RPC environments)
+  const context = await getUserContext();
+  let accountId = context.accountId;
+  let agencyId = context.agencyId;
+
+  try {
+    const resolved = await ensureAccountAndAgency(
+      authenticatedUser.id,
+      context.accountId,
+      context.agencyId,
+    );
+    accountId = resolved.accountId;
+    agencyId = resolved.agencyId;
+  } catch (err) {
+    console.error("[clients.createClient] Failed to ensure account/agency", err);
+    redirect(
+      `/clients/new?error=${encodeURIComponent(
+        "Database setup required: open Supabase → SQL Editor and run the create_client_for_user migration SQL (see repo apps/web/supabase/migrations/20260722020000_create_client_for_user.sql). Then try again.",
+      )}`,
+    );
+  }
+
   const { error } = await admin.from("clients").insert({
     agency_id: agencyId,
     account_id: accountId,
