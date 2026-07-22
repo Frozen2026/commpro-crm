@@ -480,7 +480,7 @@ export async function createClient(formData: FormData) {
     console.error("[clients.createClient] Failed to ensure account/agency", err);
     redirect(
       `/clients/new?error=${encodeURIComponent(
-        "Database setup required: open Supabase → SQL Editor and run PASTE_THIS_IN_SUPABASE.sql (or 20260722040000_workspace_setup_no_declare.sql), then try again.",
+        "Could not prepare workspace. Create one row in Table Editor → agencies (name: Default Agency), or set DEFAULT_AGENCY_ID in Vercel.",
       )}`,
     );
   }
