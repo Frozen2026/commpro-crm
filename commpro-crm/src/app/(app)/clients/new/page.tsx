@@ -2,7 +2,6 @@ import Link from "next/link";
 
 import { ClientForm } from "@/app/(app)/clients/client-form";
 import { ErrorConsoleLogger } from "@/app/(app)/clients/new/error-console-logger";
-import { WorkspaceSetupSqlCopy } from "@/app/(app)/clients/new/workspace-setup-sql-copy";
 
 type NewClientPageProps = {
   searchParams?: Promise<{
@@ -63,7 +62,8 @@ export default async function NewClientPage({ searchParams }: NewClientPageProps
         <div>
           <h2 className="text-2xl font-bold tracking-tight text-slate-900">New Client</h2>
           <p className="mt-1 text-sm text-slate-600">
-            Add a client to your account. Admins can create clients without setting up an agency first.
+            Add a client to your account. No SQL setup required — the app creates a default agency if
+            needed.
           </p>
         </div>
         <Link href="/clients" className="text-sm font-medium text-[var(--primary)]">
@@ -71,27 +71,14 @@ export default async function NewClientPage({ searchParams }: NewClientPageProps
         </Link>
       </div>
 
-      <div className="space-y-3 rounded-md border border-amber-200 bg-amber-50 p-3 text-slate-800">
-        <p className="font-semibold">One-time database setup</p>
-        <p className="text-sm">
-          If SQL Editor says <code className="text-xs">declare</code> at line 299, you are re-running an{" "}
-          <strong>old saved query</strong> — close that tab. Use only the short script below in a brand-new
-          blank query.
-        </p>
-        <ol className="list-decimal space-y-1 pl-5 text-sm">
-          <li>Supabase → SQL Editor → close every open query tab</li>
-          <li>
-            Click <strong>+ New query</strong> (empty editor — 0 lines)
-          </li>
-          <li>Copy short setup SQL → paste → Run</li>
-          <li>Expect <code className="text-xs">account_id</code> and <code className="text-xs">agency_id</code> rows</li>
-        </ol>
-        <WorkspaceSetupSqlCopy />
-      </div>
-
       {errorMessage ? (
         <div className="space-y-3 rounded-md border border-rose-200 bg-rose-50 px-3 py-3 text-sm text-rose-800">
           <p>{errorMessage}</p>
+          <p className="text-xs text-rose-700">
+            Optional fallback (no SQL Editor): Supabase → Table Editor →{" "}
+            <code className="text-[11px]">agencies</code> → Insert row with name{" "}
+            <code className="text-[11px]">Default Agency</code>, then retry.
+          </p>
         </div>
       ) : null}
 

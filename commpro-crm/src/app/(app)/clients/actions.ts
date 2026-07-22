@@ -276,9 +276,28 @@ async function ensureAccountAndAgency(
         agencyId: anyAgency.id,
       };
     }
+
+    // No account_id source and no agency yet — create a plain agency (no account_id column required)
+    const { data: createdPlain, error: plainError } = await admin
+      .from("agencies")
+      .insert({
+        name: "Default Agency",
+        status: "active",
+      })
+      .select("id")
+      .single();
+
+    if (!plainError && createdPlain?.id) {
+      return {
+        accountId: "00000000-0000-4000-8000-000000000001",
+        agencyId: String(createdPlain.id),
+      };
+    }
+
     throw new Error(
       `${err instanceof Error ? err.message : "Unable to resolve account_id."} ` +
-        "Run the short ALTER script from the New Client page (or set DEFAULT_ACCOUNT_ID / DEFAULT_AGENCY_ID).",
+        (plainError?.message ? `Agency create failed: ${plainError.message}. ` : "") +
+        "Set DEFAULT_AGENCY_ID in Vercel, or create one agency row in Table Editor.",
     );
   }
 
