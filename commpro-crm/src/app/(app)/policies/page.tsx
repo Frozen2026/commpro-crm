@@ -7,6 +7,7 @@ import { getSupabaseAdmin } from "@/lib/supabase/admin";
 
 type PolicyRow = {
   id: string;
+  client_id: string | null;
   carrier_name: string | null;
   policy_number: string | null;
   line_of_business: string | null;
@@ -29,7 +30,7 @@ type PolicyRow = {
 };
 
 const POLICY_LIST_SELECT =
-  "id, carrier_name, policy_number, line_of_business, premium, status, effective_date, expiration_date, clients ( business_name, first_name, last_name )";
+  "id, client_id, carrier_name, policy_number, line_of_business, premium, status, effective_date, expiration_date, clients ( business_name, first_name, last_name )";
 
 async function loadPolicies(context: {
   accountId: string;
@@ -138,13 +139,21 @@ export default async function PoliciesPage() {
                 <td className="px-4 py-3 text-slate-700">{policy.effective_date ?? "-"}</td>
                 <td className="px-4 py-3 text-slate-700">{policy.expiration_date ?? "-"}</td>
                 <td className="px-4 py-3">
-                  <div className="flex items-center gap-3">
+                  <div className="flex flex-wrap items-center gap-3">
                     <Link
                       href={`/policies/${policy.id}/edit`}
                       className="font-medium text-[var(--primary)]"
                     >
                       Edit
                     </Link>
+                    {policy.client_id ? (
+                      <Link
+                        href={`/coi?client_id=${policy.client_id}&policy_id=${policy.id}`}
+                        className="font-medium text-[var(--primary)]"
+                      >
+                        Issue COI
+                      </Link>
+                    ) : null}
                     <form action={deletePolicy}>
                       <input type="hidden" name="id" value={policy.id} />
                       <button type="submit" className="text-sm font-medium text-rose-600">
