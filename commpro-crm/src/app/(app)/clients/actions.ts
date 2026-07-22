@@ -545,7 +545,7 @@ export async function updateClient(formData: FormData) {
   const id = getString(formData, "id");
   const admin = getSupabaseAdmin();
 
-  const { accountId } = await ensureAccountAndAgency(
+  const resolved = await ensureAccountAndAgency(
     authenticatedUser.id,
     context.accountId,
     context.agencyId,
@@ -563,11 +563,22 @@ export async function updateClient(formData: FormData) {
     zip: getNullableString(formData, "zip"),
   };
 
-  const { error } = await admin
+  let { error } = await admin
     .from("clients")
     .update(payload)
     .eq("id", id)
-    .eq("account_id", accountId);
+    .eq("account_id", resolved.accountId);
+
+  if (error && isMissingColumnError(error.message)) {
+    let q = admin.from("clients").update(payload).eq("id", id);
+    if (resolved.agencyId) {
+      q = q.eq("agency_id", resolved.agencyId);
+    } else {
+      q = q.eq("owner_id", authenticatedUser.id);
+    }
+    const retry = await q;
+    error = retry.error;
+  }
 
   if (error) {
     console.error("[clients.updateClient] Supabase update failed", {
@@ -575,7 +586,7 @@ export async function updateClient(formData: FormData) {
       message: error.message,
       code: error.code,
       clientId: id,
-      accountId,
+      accountId: resolved.accountId,
     });
     throw new Error(`Supabase update failed: ${error.message}`);
   }
@@ -592,24 +603,35 @@ export async function deleteClient(formData: FormData) {
   const id = getString(formData, "id");
   const admin = getSupabaseAdmin();
 
-  const { accountId } = await ensureAccountAndAgency(
+  const resolved = await ensureAccountAndAgency(
     authenticatedUser.id,
     context.accountId,
     context.agencyId,
   );
 
-  const { error } = await admin
+  let { error } = await admin
     .from("clients")
     .delete()
     .eq("id", id)
-    .eq("account_id", accountId);
+    .eq("account_id", resolved.accountId);
+
+  if (error && isMissingColumnError(error.message)) {
+    let q = admin.from("clients").delete().eq("id", id);
+    if (resolved.agencyId) {
+      q = q.eq("agency_id", resolved.agencyId);
+    } else {
+      q = q.eq("owner_id", authenticatedUser.id);
+    }
+    const retry = await q;
+    error = retry.error;
+  }
 
   if (error) {
     console.error("[clients.deleteClient] Supabase delete failed", {
       rawError: JSON.stringify(error),
       message: error.message,
       clientId: id,
-      accountId,
+      accountId: resolved.accountId,
     });
     throw new Error(`Supabase delete failed: ${error.message}`);
   }
