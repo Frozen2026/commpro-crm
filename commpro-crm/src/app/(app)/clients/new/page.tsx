@@ -85,7 +85,7 @@ export default async function NewClientPage({ searchParams }: NewClientPageProps
                 <li>Open your Supabase project → SQL Editor</li>
                 <li>
                   Paste and run the full contents of{" "}
-                  <code className="text-xs">20260722020000_create_client_for_user.sql</code>
+                  <code className="text-xs">20260722030000_fix_agency_account_id_rpc.sql</code>
                 </li>
                 <li>Confirm the notice says &quot;Workspace ready&quot;</li>
                 <li>Return here and create the client again</li>
@@ -94,7 +94,7 @@ export default async function NewClientPage({ searchParams }: NewClientPageProps
                 Raw file:{" "}
                 <a
                   className="font-medium text-[var(--primary)] underline"
-                  href="https://raw.githubusercontent.com/Frozen2026/commpro-crm/main/apps/web/supabase/migrations/20260722020000_create_client_for_user.sql"
+                  href="https://raw.githubusercontent.com/Frozen2026/commpro-crm/main/apps/web/supabase/migrations/20260722030000_fix_agency_account_id_rpc.sql"
                   target="_blank"
                   rel="noreferrer"
                 >
