@@ -15,8 +15,6 @@ import {
   Workflow,
 } from "lucide-react";
 
-import { PublicChatbotWidget } from "@/components/public-chatbot-widget";
-
 const industries = [
   {
     name: "General Contractors",
@@ -73,48 +71,21 @@ const features = [
   },
 ];
 
+const stats = [
+  { value: "24/7", label: "Always-on AI quote intake" },
+  { value: "1 place", label: "Leads, policies, COIs, and renewals" },
+  { value: "4 sectors", label: "Contractors, concrete, trucking, intermodal" },
+];
+
 export const metadata: Metadata = {
-  title: "CommPro.ai | Insurance for Builders and Haulers",
-  description: "CommPro.ai helps agencies serve contractors, trucking, concrete, and intermodal accounts.",
+  title: "CommPro.ai | Insurance CRM for Builders and Haulers",
+  description:
+    "CommPro.ai helps commercial insurance agencies serve contractors, trucking, concrete, and intermodal accounts with a modern CRM, AI quote intake, and COI workflows.",
 };
 
 export default function Home() {
   return (
-    <main className="relative overflow-hidden">
-      <div className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(circle_at_top_left,_rgba(37,99,235,0.16),_transparent_34%),radial-gradient(circle_at_top_right,_rgba(15,23,42,0.08),_transparent_28%),linear-gradient(180deg,#f8fbff_0%,#eef4fb_42%,#f7fafc_100%)]" />
-
-      <header className="sticky top-0 z-40 border-b border-white/50 bg-white/75 backdrop-blur-xl">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4 lg:px-8">
-          <Link href="/" className="flex items-center gap-3 text-slate-900">
-            <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-slate-900 text-sm font-black text-white shadow-lg shadow-slate-900/15">
-              C
-            </div>
-            <div>
-              <p className="text-sm font-semibold uppercase tracking-[0.25em] text-slate-500">CommPro.ai</p>
-              <p className="text-base font-semibold">Commercial insurance CRM</p>
-            </div>
-          </Link>
-
-          <nav className="hidden items-center gap-6 md:flex">
-            <Link href="/" className="text-sm font-medium text-slate-700 transition hover:text-slate-950">
-              Home
-            </Link>
-            <Link href="/coi-request" className="text-sm font-medium text-slate-700 transition hover:text-slate-950">
-              Get AI Quote
-            </Link>
-            <Link href="/coi-request" className="text-sm font-medium text-slate-700 transition hover:text-slate-950">
-              COI Request
-            </Link>
-            <Link
-              href="/login"
-              className="inline-flex items-center rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-900 shadow-sm transition hover:border-slate-300 hover:bg-slate-50"
-            >
-              Login
-            </Link>
-          </nav>
-        </div>
-      </header>
-
+    <>
       <section className="mx-auto grid max-w-7xl gap-14 px-6 py-16 lg:grid-cols-[1.15fr_0.85fr] lg:px-8 lg:py-24">
         <div className="max-w-3xl">
           <div className="inline-flex items-center gap-2 rounded-full border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-medium text-blue-900 shadow-sm shadow-blue-100/60">
@@ -132,17 +103,17 @@ export default function Home() {
 
           <div className="mt-8 flex flex-col gap-3 sm:flex-row">
             <Link
-              href="/coi-request"
+              href="/contact"
               className="inline-flex items-center justify-center gap-2 rounded-full bg-slate-950 px-6 py-3.5 text-sm font-semibold text-white shadow-lg shadow-slate-950/20 transition hover:-translate-y-0.5 hover:bg-slate-800"
             >
-              Get AI Quote
+              Book a demo
               <ArrowRight className="h-4 w-4" />
             </Link>
             <Link
-              href="/dashboard"
+              href="/features"
               className="inline-flex items-center justify-center rounded-full border border-slate-300 bg-white px-6 py-3.5 text-sm font-semibold text-slate-900 shadow-sm transition hover:border-slate-400 hover:bg-slate-50"
             >
-              View the CRM
+              Explore features
             </Link>
           </div>
 
@@ -207,10 +178,26 @@ export default function Home() {
         </div>
       </section>
 
+      <section className="mx-auto max-w-7xl px-6 pb-4 lg:px-8">
+        <div className="grid gap-4 rounded-[2rem] border border-slate-200 bg-white/80 p-6 shadow-[0_14px_40px_rgba(15,23,42,0.06)] backdrop-blur sm:grid-cols-3 sm:p-8">
+          {stats.map((stat) => (
+            <div key={stat.label} className="text-center sm:text-left">
+              <p className="text-3xl font-black tracking-tight text-slate-950">{stat.value}</p>
+              <p className="mt-1 text-sm text-slate-600">{stat.label}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
       <section className="mx-auto max-w-7xl px-6 py-8 lg:px-8 lg:py-16">
-        <div className="max-w-2xl">
-          <p className="text-sm font-semibold uppercase tracking-[0.28em] text-slate-500">Industries</p>
-          <h2 className="mt-3 text-3xl font-black tracking-tight text-slate-950 sm:text-4xl">Focused on the sectors that keep jobs moving</h2>
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+          <div className="max-w-2xl">
+            <p className="text-sm font-semibold uppercase tracking-[0.28em] text-slate-500">Industries</p>
+            <h2 className="mt-3 text-3xl font-black tracking-tight text-slate-950 sm:text-4xl">Focused on the sectors that keep jobs moving</h2>
+          </div>
+          <Link href="/industries" className="inline-flex items-center gap-2 text-sm font-semibold text-slate-700 transition hover:text-slate-950">
+            See all industries <ArrowRight className="h-4 w-4" />
+          </Link>
         </div>
 
         <div className="mt-8 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -236,8 +223,8 @@ export default function Home() {
             <p className="text-sm font-semibold uppercase tracking-[0.28em] text-slate-500">Features</p>
             <h2 className="mt-3 text-3xl font-black tracking-tight text-slate-950 sm:text-4xl">CRM capabilities your team can run every day</h2>
           </div>
-          <Link href="/login" className="inline-flex items-center gap-2 text-sm font-semibold text-slate-700 transition hover:text-slate-950">
-            Sign in to the CRM <ArrowRight className="h-4 w-4" />
+          <Link href="/features" className="inline-flex items-center gap-2 text-sm font-semibold text-slate-700 transition hover:text-slate-950">
+            Explore all features <ArrowRight className="h-4 w-4" />
           </Link>
         </div>
 
@@ -262,18 +249,16 @@ export default function Home() {
         <div className="rounded-[2rem] border border-slate-200 bg-slate-950 px-6 py-8 text-white shadow-[0_24px_80px_rgba(15,23,42,0.22)] sm:px-8">
           <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
             <div>
-              <p className="text-sm font-semibold uppercase tracking-[0.28em] text-white/55">COI Request</p>
-              <h2 className="mt-2 text-3xl font-black tracking-tight sm:text-4xl">Move certificate requests out of email and into a clean workflow.</h2>
+              <p className="text-sm font-semibold uppercase tracking-[0.28em] text-white/55">Ready when you are</p>
+              <h2 className="mt-2 text-3xl font-black tracking-tight sm:text-4xl">See how CommPro.ai runs your agency&apos;s day.</h2>
             </div>
-            <Link href="/coi-request" className="inline-flex items-center justify-center gap-2 rounded-full bg-white px-6 py-3 text-sm font-semibold text-slate-950 transition hover:bg-slate-100">
-              Get AI Quote
+            <Link href="/contact" className="inline-flex items-center justify-center gap-2 rounded-full bg-white px-6 py-3 text-sm font-semibold text-slate-950 transition hover:bg-slate-100">
+              Book a demo
               <ArrowRight className="h-4 w-4" />
             </Link>
           </div>
         </div>
       </section>
-
-      <PublicChatbotWidget />
-    </main>
+    </>
   );
 }
