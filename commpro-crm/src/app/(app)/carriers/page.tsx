@@ -1,3 +1,10 @@
+import {
+  seedDefaultCarriers,
+  STANDARD_LINES_OF_BUSINESS,
+} from "@/app/(app)/carriers/actions";
+import { CarrierEditorCard } from "@/app/(app)/carriers/carrier-editor-card";
+import { getSupabaseAdmin } from "@/lib/supabase/admin";
+
 type CarrierRow = {
   id: string;
   name: string;
@@ -9,7 +16,7 @@ type CarrierRow = {
 
 function normalizeLines(value: CarrierRow["lines_of_business"]) {
   if (Array.isArray(value)) {
-    return value;
+    return value.filter((line): line is string => typeof line === "string" && line.trim().length > 0);
   }
   if (typeof value === "string" && value.trim().length > 0) {
     return value
@@ -29,37 +36,56 @@ export default async function CarriersPage({
   const query = (params.q ?? "").trim();
   const selectedLine = (params.line_of_business ?? "").trim();
 
-  const { createClient } = await import("@/lib/supabase/server");
-  const supabase = await createClient();
-
-  const { data } = await supabase
+  const admin = getSupabaseAdmin();
+  const { data, error } = await admin
     .from("insurance_carriers")
     .select("id, name, am_best_rating, lines_of_business, writes_uiia, is_preferred")
     .order("name", { ascending: true });
 
-  const carriers = ((data ?? []) as CarrierRow[]).filter((carrier) => {
-    const lines = normalizeLines(carrier.lines_of_business);
+  if (error) {
+    console.error("[carriers.page] load failed", error.message);
+  }
+
+  const allCarriers = ((data ?? []) as CarrierRow[]).map((carrier) => ({
+    ...carrier,
+    lines: normalizeLines(carrier.lines_of_business),
+  }));
+
+  const carriers = allCarriers.filter((carrier) => {
     const matchesQuery =
       query.length === 0 || carrier.name.toLowerCase().includes(query.toLowerCase());
     const matchesLine =
       selectedLine.length === 0 ||
-      lines.some((line) => line.toLowerCase() === selectedLine.toLowerCase());
+      carrier.lines.some((line) => line.toLowerCase() === selectedLine.toLowerCase());
     return matchesQuery && matchesLine;
   });
 
   const allLines = Array.from(
-    new Set(
-      ((data ?? []) as CarrierRow[])
-        .flatMap((carrier) => normalizeLines(carrier.lines_of_business))
-        .filter(Boolean)
-    )
+    new Set([
+      ...STANDARD_LINES_OF_BUSINESS,
+      ...allCarriers.flatMap((carrier) => carrier.lines),
+    ]),
   ).sort((a, b) => a.localeCompare(b));
 
   return (
-    <section className="space-y-4">
-      <div>
-        <h2 className="text-2xl font-bold tracking-tight text-slate-900">Carriers</h2>
-        <p className="mt-1 text-sm text-slate-600">Carrier directory with appetite and preference indicators.</p>
+    <section className="space-y-6">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 className="text-2xl font-bold tracking-tight text-slate-900">Carriers</h2>
+          <p className="mt-1 text-sm text-slate-600">
+            Edit carrier details and lines of business. Changes appear in the policy carrier list.
+          </p>
+        </div>
+        {allCarriers.length === 0 ? (
+          <form action={seedDefaultCarriers}>
+            <button
+              type="submit"
+              className="rounded-md border border-[var(--border)] bg-white px-4 py-2 text-sm font-medium text-slate-800 hover:bg-slate-50"
+            >
+              Load default carriers
+            </button>
+          </form>
+        ) : null}
       </div>
 
       <form className="grid gap-3 rounded-xl border border-[var(--border)] bg-white p-4 md:grid-cols-3">
@@ -83,65 +109,43 @@ export default async function CarriersPage({
         </select>
         <button
           type="submit"
-          className="rounded-md bg-[#2563eb] px-4 py-2 text-sm font-semibold text-white hover:opacity-95"
+          className="rounded-md bg-[var(--primary)] px-4 py-2 text-sm font-semibold text-white hover:opacity-95"
         >
-          Apply Filters
+          Apply filters
         </button>
       </form>
 
-      <div className="overflow-x-auto rounded-xl border border-[var(--border)] bg-white">
-        <table className="min-w-full text-sm">
-          <thead className="bg-slate-50 text-left text-slate-600">
-            <tr>
-              <th className="px-4 py-3 font-semibold">Name</th>
-              <th className="px-4 py-3 font-semibold">AM Best</th>
-              <th className="px-4 py-3 font-semibold">Lines of Business</th>
-              <th className="px-4 py-3 font-semibold">UIIA</th>
-              <th className="px-4 py-3 font-semibold">Preferred</th>
-            </tr>
-          </thead>
-          <tbody>
-            {carriers.map((carrier) => {
-              const lines = normalizeLines(carrier.lines_of_business);
-              return (
-                <tr key={carrier.id} className="border-t border-[var(--border)] align-top">
-                  <td className="px-4 py-3 text-slate-900">{carrier.name}</td>
-                  <td className="px-4 py-3 text-slate-700">{carrier.am_best_rating ?? "-"}</td>
-                  <td className="px-4 py-3">
-                    <div className="flex flex-wrap gap-1.5">
-                      {lines.length > 0 ? (
-                        lines.map((line) => (
-                          <span key={`${carrier.id}-${line}`} className="rounded-full bg-slate-100 px-2 py-1 text-xs text-slate-700">
-                            {line}
-                          </span>
-                        ))
-                      ) : (
-                        <span className="text-slate-500">-</span>
-                      )}
-                    </div>
-                  </td>
-                  <td className="px-4 py-3">
-                    {carrier.writes_uiia ? (
-                      <span className="rounded-full bg-emerald-100 px-2 py-1 text-xs font-medium text-emerald-700">Writes UIIA</span>
-                    ) : (
-                      <span className="rounded-full bg-slate-100 px-2 py-1 text-xs font-medium text-slate-600">No UIIA</span>
-                    )}
-                  </td>
-                  <td className="px-4 py-3 text-xl leading-none text-amber-500">
-                    {carrier.is_preferred ? "★" : "☆"}
-                  </td>
-                </tr>
-              );
-            })}
-            {carriers.length === 0 ? (
-              <tr>
-                <td colSpan={5} className="px-4 py-8 text-center text-slate-500">
-                  No carriers match your filters.
-                </td>
-              </tr>
-            ) : null}
-          </tbody>
-        </table>
+      <div className="space-y-3">
+        <h3 className="text-sm font-semibold text-slate-800">Add carrier</h3>
+        <CarrierEditorCard mode="create" />
+      </div>
+
+      <div className="space-y-3">
+        <h3 className="text-sm font-semibold text-slate-800">
+          Edit carriers ({carriers.length})
+        </h3>
+        {carriers.map((carrier) => (
+          <CarrierEditorCard
+            key={carrier.id}
+            mode="edit"
+            carrier={{
+              id: carrier.id,
+              name: carrier.name,
+              am_best_rating: carrier.am_best_rating,
+              lines_of_business: carrier.lines,
+              writes_uiia: Boolean(carrier.writes_uiia),
+              is_preferred: Boolean(carrier.is_preferred),
+            }}
+          />
+        ))}
+        {carriers.length === 0 ? (
+          <div className="rounded-xl border border-dashed border-[var(--border)] bg-white px-4 py-8 text-center text-sm text-slate-500">
+            No carriers match your filters.
+            {allCarriers.length === 0
+              ? " Use “Load default carriers” or add one above."
+              : null}
+          </div>
+        ) : null}
       </div>
     </section>
   );
