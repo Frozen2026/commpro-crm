@@ -1,8 +1,7 @@
--- Fix production agencies/clients schema drift, then install workspace RPCs.
--- Safe to re-run. Paste entire script into Supabase SQL Editor.
--- Uses unique dollar-quote tags (no nested $$) so the editor does not mis-parse DECLARE.
+-- CommPro workspace bootstrap + client RPCs (Supabase SQL Editor safe).
+-- No DO blocks. No nested dollar-quotes. Safe to re-run.
+-- Paste this ENTIRE file into SQL Editor and click Run.
 
--- ---------- 1) Ensure accounts tables ----------
 create table if not exists public.accounts (
   id uuid primary key default gen_random_uuid(),
   primary_owner_user_id uuid references auth.users(id) on delete cascade,
@@ -31,7 +30,6 @@ create table if not exists public.accounts_memberships (
   primary key (user_id, account_id)
 );
 
--- ---------- 2) Ensure agencies exists + has account_id ----------
 create table if not exists public.agencies (
   id uuid primary key default gen_random_uuid(),
   name text not null,
@@ -44,7 +42,6 @@ alter table public.agencies add column if not exists name text;
 alter table public.agencies add column if not exists status text default 'active';
 alter table public.agencies add column if not exists created_at timestamptz default now();
 
--- ---------- 3) Ensure clients exists + has required columns ----------
 create table if not exists public.clients (
   id uuid primary key default gen_random_uuid(),
   first_name text,
@@ -65,51 +62,48 @@ alter table public.clients add column if not exists state text;
 alter table public.clients add column if not exists zip text;
 alter table public.clients add column if not exists created_at timestamptz default now();
 
--- ---------- 4) Bootstrap a default account and backfill null account_ids ----------
-do $boot$
-declare
-  v_account_id uuid;
-  v_user_id uuid;
-begin
-  select id into v_user_id from auth.users order by created_at asc nulls last limit 1;
+-- Bootstrap account (plain SQL, no DO/DECLARE)
+insert into public.accounts (name, primary_owner_user_id, is_personal_account)
+select 'CommPro Account', u.id, false
+from auth.users u
+where not exists (select 1 from public.accounts)
+order by u.created_at asc nulls last
+limit 1;
 
-  select id into v_account_id from public.accounts order by created_at asc nulls last limit 1;
+insert into public.accounts (name, is_personal_account)
+select 'CommPro Account', false
+where not exists (select 1 from public.accounts);
 
-  if v_account_id is null then
-    insert into public.accounts (name, primary_owner_user_id, is_personal_account)
-    values ('CommPro Account', v_user_id, false)
-    returning id into v_account_id;
-  end if;
+insert into public.accounts_memberships (user_id, account_id, account_role)
+select u.id, a.id, 'owner'
+from auth.users u
+cross join lateral (
+  select id from public.accounts order by created_at asc nulls last limit 1
+) a
+order by u.created_at asc nulls last
+limit 1
+on conflict (user_id, account_id) do nothing;
 
-  if v_user_id is not null then
-    insert into public.accounts_memberships (user_id, account_id, account_role)
-    values (v_user_id, v_account_id, 'owner')
-    on conflict (user_id, account_id) do nothing;
-  end if;
+update public.agencies g
+set account_id = a.id
+from (select id from public.accounts order by created_at asc nulls last limit 1) a
+where g.account_id is null;
 
-  update public.agencies
-  set account_id = v_account_id
-  where account_id is null;
+update public.clients c
+set account_id = a.id
+from (select id from public.accounts order by created_at asc nulls last limit 1) a
+where c.account_id is null;
 
-  update public.clients
-  set account_id = v_account_id
-  where account_id is null;
+insert into public.agencies (account_id, name, status)
+select a.id, 'Default Agency', 'active'
+from (select id from public.accounts order by created_at asc nulls last limit 1) a
+where not exists (select 1 from public.agencies);
 
-  if not exists (select 1 from public.agencies) then
-    insert into public.agencies (account_id, name, status)
-    values (v_account_id, 'Default Agency', 'active');
-  end if;
+update public.clients c
+set agency_id = g.id
+from (select id from public.agencies order by created_at asc nulls last limit 1) g
+where c.agency_id is null;
 
-  update public.clients c
-  set agency_id = a.id
-  from (
-    select id from public.agencies order by created_at asc nulls last limit 1
-  ) a
-  where c.agency_id is null;
-end;
-$boot$;
-
--- ---------- 5) RPCs (column-safe) ----------
 create or replace function public.ensure_workspace_for_user(p_user_id uuid)
 returns jsonb
 language plpgsql
@@ -167,16 +161,16 @@ begin
   end;
 
   if v_has_account_col then
-    execute
-      'select g.id from public.agencies g where g.account_id = $1 order by g.created_at asc nulls last limit 1'
-      into v_agency_id
-      using v_account_id;
+    select g.id into v_agency_id
+    from public.agencies g
+    where g.account_id = v_account_id
+    order by g.created_at asc nulls last
+    limit 1;
 
     if v_agency_id is null then
-      execute
-        'insert into public.agencies (account_id, name, status) values ($1, $2, $3) returning id'
-        into v_agency_id
-        using v_account_id, 'Default Agency', 'active';
+      insert into public.agencies (account_id, name, status)
+      values (v_account_id, 'Default Agency', 'active')
+      returning id into v_agency_id;
     end if;
   else
     select g.id into v_agency_id
@@ -191,7 +185,6 @@ begin
     end if;
   end if;
 
-  -- Optional table; ignore if missing or columns differ
   begin
     insert into public.agent_profiles (id, account_id, agency_id)
     values (p_user_id, v_account_id, v_agency_id)
@@ -313,3 +306,9 @@ grant select, insert, update, delete on public.agencies to service_role;
 grant select, insert, update, delete on public.clients to service_role;
 
 notify pgrst, 'reload schema';
+
+-- Smoke check (returns account_id + agency_id when users exist)
+select public.ensure_workspace_for_user(id) as workspace
+from auth.users
+order by created_at asc
+limit 1;

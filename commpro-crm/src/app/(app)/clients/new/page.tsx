@@ -84,17 +84,16 @@ export default async function NewClientPage({ searchParams }: NewClientPageProps
               <ol className="mt-2 list-decimal space-y-1 pl-5">
                 <li>Open your Supabase project → SQL Editor</li>
                 <li>
-                  Paste and run the full contents of{" "}
-                  <code className="text-xs">20260722030000_fix_agency_account_id_rpc.sql</code>
+                  Paste and run the full contents of the SQL file linked below (entire file, one run)
                 </li>
-                <li>Confirm the notice says &quot;Workspace ready&quot;</li>
+                <li>Confirm the result returns a <code className="text-xs">workspace</code> JSON row</li>
                 <li>Return here and create the client again</li>
               </ol>
               <p className="mt-2 text-xs text-slate-600">
                 Raw file:{" "}
                 <a
                   className="font-medium text-[var(--primary)] underline"
-                  href="https://raw.githubusercontent.com/Frozen2026/commpro-crm/main/apps/web/supabase/migrations/20260722030000_fix_agency_account_id_rpc.sql"
+                  href="https://raw.githubusercontent.com/Frozen2026/commpro-crm/cursor/fix-sql-editor-declare-ff54/apps/web/supabase/migrations/20260722030000_fix_agency_account_id_rpc.sql"
                   target="_blank"
                   rel="noreferrer"
                 >
