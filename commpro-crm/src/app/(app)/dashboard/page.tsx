@@ -60,7 +60,7 @@ export default async function DashboardPage() {
         {cards.map((card) => (
           <article key={card.title} className="rounded-xl border border-[var(--border)] bg-white p-5 shadow-sm">
             <p className="text-sm font-medium text-slate-600">{card.title}</p>
-            <p className="mt-2 text-3xl font-bold tracking-tight text-[#2563eb]">{card.value}</p>
+            <p className="mt-2 text-3xl font-bold tracking-tight text-[var(--primary)]">{card.value}</p>
           </article>
         ))}
       </div>

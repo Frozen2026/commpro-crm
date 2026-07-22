@@ -33,7 +33,7 @@ export function OpsControlPanel() {
           type="button"
           disabled={pending}
           onClick={() => run("apply")}
-          className="rounded-md bg-[#2563eb] px-4 py-2 text-sm font-semibold text-white hover:opacity-95 disabled:opacity-60"
+          className="rounded-md bg-[var(--primary)] px-4 py-2 text-sm font-semibold text-white hover:opacity-95 disabled:opacity-60"
         >
           {pending ? "Running…" : "Scan & auto-repair"}
         </button>

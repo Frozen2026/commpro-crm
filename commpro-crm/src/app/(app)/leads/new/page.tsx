@@ -7,7 +7,7 @@ export default function NewLeadPage() {
     <section className="space-y-4">
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-bold tracking-tight text-slate-900">New Lead</h2>
-        <Link href="/leads" className="text-sm font-medium text-[#2563eb]">
+        <Link href="/leads" className="text-sm font-medium text-[var(--primary)]">
           Back to Leads
         </Link>
       </div>

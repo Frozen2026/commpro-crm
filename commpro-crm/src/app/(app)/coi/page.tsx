@@ -76,7 +76,7 @@ export default async function CoiRequestPage({
           <span className="font-medium text-slate-700">Email</span>
           <input name="email" type="email" defaultValue={email} className="w-full rounded-md border border-[var(--border)] px-3 py-2" />
         </label>
-        <button type="submit" className="w-fit rounded-md bg-[#2563eb] px-4 py-2 text-sm font-semibold text-white hover:opacity-95">
+        <button type="submit" className="w-fit rounded-md bg-[var(--primary)] px-4 py-2 text-sm font-semibold text-white hover:opacity-95">
           Search Client
         </button>
       </form>
@@ -123,7 +123,7 @@ export default async function CoiRequestPage({
             <textarea name="certificate_holder_address" rows={3} className="w-full rounded-md border border-[var(--border)] px-3 py-2" />
           </label>
 
-          <button type="submit" className="rounded-md bg-[#2563eb] px-4 py-2 text-sm font-semibold text-white hover:opacity-95">
+          <button type="submit" className="rounded-md bg-[var(--primary)] px-4 py-2 text-sm font-semibold text-white hover:opacity-95">
             Download PDF
           </button>
         </form>

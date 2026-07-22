@@ -77,7 +77,7 @@ export function CsaManagerClient({
             type="button"
             onClick={() => setTab(item.key as "score" | "alerts" | "lead-generator")}
             className={`rounded-md px-3 py-2 text-sm font-medium ${
-              tab === item.key ? "bg-[#2563eb] text-white" : "bg-white text-slate-700 border border-[var(--border)]"
+              tab === item.key ? "bg-[var(--primary)] text-white" : "bg-white text-slate-700 border border-[var(--border)]"
             }`}
           >
             {item.label}
@@ -92,7 +92,7 @@ export function CsaManagerClient({
               <span className="font-medium text-slate-700">DOT Number</span>
               <input name="dot" defaultValue={dotNumber} placeholder="Search by DOT" className="rounded-md border border-[var(--border)] px-3 py-2" />
             </label>
-            <button type="submit" className="rounded-md bg-[#2563eb] px-4 py-2 text-sm font-semibold text-white hover:opacity-95">
+            <button type="submit" className="rounded-md bg-[var(--primary)] px-4 py-2 text-sm font-semibold text-white hover:opacity-95">
               Search
             </button>
           </form>
@@ -191,7 +191,7 @@ export function CsaManagerClient({
             </label>
           </div>
 
-          <button type="submit" disabled={loading} className="rounded-md bg-[#2563eb] px-4 py-2 text-sm font-semibold text-white hover:opacity-95 disabled:opacity-70">
+          <button type="submit" disabled={loading} className="rounded-md bg-[var(--primary)] px-4 py-2 text-sm font-semibold text-white hover:opacity-95 disabled:opacity-70">
             {loading ? "Generating..." : "Run Lead Generator"}
           </button>
 

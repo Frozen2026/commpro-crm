@@ -46,7 +46,7 @@ export default async function AiChatbotPage() {
                 key={`${message.createdAt}-${index}`}
                 className={`rounded-md px-3 py-2 text-sm ${
                   message.role === "user"
-                    ? "ml-6 bg-[#2563eb] text-white"
+                    ? "ml-6 bg-[var(--primary)] text-white"
                     : "mr-6 bg-white text-slate-800 border border-[var(--border)]"
                 }`}
               >
@@ -71,7 +71,7 @@ export default async function AiChatbotPage() {
               placeholder="Example: Help me prioritize this week\'s renewals by retention risk."
               className="w-full rounded-md border border-[var(--border)] px-3 py-2 text-sm"
             />
-            <button type="submit" className="rounded-md bg-[#2563eb] px-4 py-2 text-sm font-semibold text-white hover:opacity-95">
+            <button type="submit" className="rounded-md bg-[var(--primary)] px-4 py-2 text-sm font-semibold text-white hover:opacity-95">
               Send to Assistant
             </button>
           </form>

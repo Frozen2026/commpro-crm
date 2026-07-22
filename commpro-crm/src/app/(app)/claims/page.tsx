@@ -53,7 +53,7 @@ export default async function ClaimsPage() {
           <h2 className="text-2xl font-bold tracking-tight text-slate-900">Claims</h2>
           <p className="mt-1 text-sm text-slate-600">Manage claim status, reserves, and adjuster tracking.</p>
         </div>
-        <Link href="/claims/new" className="rounded-md bg-[#2563eb] px-4 py-2 text-sm font-semibold text-white hover:opacity-95">
+        <Link href="/claims/new" className="rounded-md bg-[var(--primary)] px-4 py-2 text-sm font-semibold text-white hover:opacity-95">
           Add Claim
         </Link>
       </div>
@@ -100,7 +100,7 @@ export default async function ClaimsPage() {
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-3">
-                      <Link href={`/claims/${claim.id}/edit`} className="font-medium text-[#2563eb]">
+                      <Link href={`/claims/${claim.id}/edit`} className="font-medium text-[var(--primary)]">
                         Edit
                       </Link>
                       <form action={deleteClaim}>
