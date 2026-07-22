@@ -1,5 +1,6 @@
 -- Fix production agencies/clients schema drift, then install workspace RPCs.
 -- Safe to re-run. Paste entire script into Supabase SQL Editor.
+-- Uses unique dollar-quote tags (no nested $$) so the editor does not mis-parse DECLARE.
 
 -- ---------- 1) Ensure accounts tables ----------
 create table if not exists public.accounts (
@@ -65,7 +66,7 @@ alter table public.clients add column if not exists zip text;
 alter table public.clients add column if not exists created_at timestamptz default now();
 
 -- ---------- 4) Bootstrap a default account and backfill null account_ids ----------
-do $$
+do $boot$
 declare
   v_account_id uuid;
   v_user_id uuid;
@@ -94,20 +95,19 @@ begin
   set account_id = v_account_id
   where account_id is null;
 
-  -- If no agency rows, create one
   if not exists (select 1 from public.agencies) then
     insert into public.agencies (account_id, name, status)
     values (v_account_id, 'Default Agency', 'active');
   end if;
 
-  -- Backfill clients.agency_id when null
   update public.clients c
   set agency_id = a.id
   from (
     select id from public.agencies order by created_at asc nulls last limit 1
   ) a
   where c.agency_id is null;
-end $$;
+end;
+$boot$;
 
 -- ---------- 5) RPCs (column-safe) ----------
 create or replace function public.ensure_workspace_for_user(p_user_id uuid)
@@ -115,7 +115,7 @@ returns jsonb
 language plpgsql
 security definer
 set search_path = public
-as $$
+as $ensure$
 declare
   v_account_id uuid;
   v_agency_id uuid;
@@ -185,21 +185,19 @@ begin
     limit 1;
 
     if v_agency_id is null then
-      -- last resort without account_id column
       insert into public.agencies (name, status)
       values ('Default Agency', 'active')
       returning id into v_agency_id;
     end if;
   end if;
 
+  -- Optional table; ignore if missing or columns differ
   begin
-    execute $q$
-      insert into public.agent_profiles (id, account_id, agency_id)
-      values ($1, $2, $3)
-      on conflict (id) do update
-        set account_id = excluded.account_id,
-            agency_id = excluded.agency_id
-    $q$ using p_user_id, v_account_id, v_agency_id;
+    insert into public.agent_profiles (id, account_id, agency_id)
+    values (p_user_id, v_account_id, v_agency_id)
+    on conflict (id) do update
+      set account_id = excluded.account_id,
+          agency_id = excluded.agency_id;
   exception when others then
     null;
   end;
@@ -209,7 +207,7 @@ begin
     'agency_id', v_agency_id
   );
 end;
-$$;
+$ensure$;
 
 create or replace function public.create_client_for_user(
   p_user_id uuid,
@@ -227,7 +225,7 @@ returns jsonb
 language plpgsql
 security definer
 set search_path = public
-as $$
+as $create$
 declare
   v_workspace jsonb;
   v_account_id uuid;
@@ -301,7 +299,7 @@ begin
     'agency_id', v_agency_id
   );
 end;
-$$;
+$create$;
 
 revoke all on function public.ensure_workspace_for_user(uuid) from public;
 revoke all on function public.create_client_for_user(uuid, text, text, text, text, text, text, text, text, text) from public;
@@ -315,18 +313,3 @@ grant select, insert, update, delete on public.agencies to service_role;
 grant select, insert, update, delete on public.clients to service_role;
 
 notify pgrst, 'reload schema';
-
--- Verify
-do $$
-declare
-  u uuid;
-  w jsonb;
-begin
-  select id into u from auth.users order by created_at asc limit 1;
-  if u is not null then
-    w := public.ensure_workspace_for_user(u);
-    raise notice 'Workspace ready: %', w;
-  else
-    raise notice 'No auth users yet — workspace will be created on first client insert.';
-  end if;
-end $$;
