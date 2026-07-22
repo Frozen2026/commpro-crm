@@ -2,7 +2,8 @@ import Link from "next/link";
 
 import { deletePolicy } from "@/app/(app)/policies/actions";
 import { getUserContext } from "@/lib/account-context";
-import { createClient } from "@/lib/supabase/server";
+import { isMissingColumnError } from "@/lib/clients-query";
+import { getSupabaseAdmin } from "@/lib/supabase/admin";
 
 type PolicyRow = {
   id: string;
@@ -18,21 +19,80 @@ type PolicyRow = {
         business_name: string | null;
         first_name: string | null;
         last_name: string | null;
+      }
+    | {
+        business_name: string | null;
+        first_name: string | null;
+        last_name: string | null;
       }[]
     | null;
 };
 
-export default async function PoliciesPage() {
-  const context = await getUserContext();
-  const supabase = await createClient();
+const POLICY_LIST_SELECT =
+  "id, carrier_name, policy_number, line_of_business, premium, status, effective_date, expiration_date, clients ( business_name, first_name, last_name )";
 
-  const { data } = await supabase
+async function loadPolicies(context: {
+  accountId: string;
+  agencyId: string | null;
+}): Promise<PolicyRow[]> {
+  const admin = getSupabaseAdmin();
+
+  {
+    const { data, error } = await admin
+      .from("policies")
+      .select(POLICY_LIST_SELECT)
+      .eq("account_id", context.accountId)
+      .order("created_at", { ascending: false });
+
+    if (!error) {
+      return (data ?? []) as PolicyRow[];
+    }
+
+    if (!isMissingColumnError(error.message)) {
+      console.error("[policies.page] account-scoped select failed", error.message);
+      return [];
+    }
+  }
+
+  if (context.agencyId) {
+    const { data, error } = await admin
+      .from("policies")
+      .select(POLICY_LIST_SELECT)
+      .eq("agency_id", context.agencyId)
+      .order("created_at", { ascending: false });
+
+    if (!error) {
+      return (data ?? []) as PolicyRow[];
+    }
+    console.error("[policies.page] agency-scoped select failed", error.message);
+  }
+
+  const { data, error } = await admin
     .from("policies")
-    .select("id, carrier_name, policy_number, line_of_business, premium, status, effective_date, expiration_date, clients ( business_name, first_name, last_name )")
-    .eq("account_id", context.accountId)
+    .select(POLICY_LIST_SELECT)
     .order("created_at", { ascending: false });
 
-  const policies = (data ?? []) as PolicyRow[];
+  if (error) {
+    console.error("[policies.page] unscoped select failed", error.message);
+    return [];
+  }
+
+  return (data ?? []) as PolicyRow[];
+}
+
+function clientName(policy: PolicyRow) {
+  const raw = policy.clients;
+  const primary = Array.isArray(raw) ? raw[0] ?? null : raw;
+  return (
+    primary?.business_name ||
+    [primary?.first_name, primary?.last_name].filter(Boolean).join(" ") ||
+    "-"
+  );
+}
+
+export default async function PoliciesPage() {
+  const context = await getUserContext();
+  const policies = await loadPolicies(context);
 
   return (
     <section className="space-y-4">
@@ -41,7 +101,10 @@ export default async function PoliciesPage() {
           <h2 className="text-2xl font-bold tracking-tight text-slate-900">Policies</h2>
           <p className="mt-1 text-sm text-slate-600">Track policy lifecycle, carriers, and premium values.</p>
         </div>
-        <Link href="/policies/new" className="rounded-md bg-[#2563eb] px-4 py-2 text-sm font-semibold text-white hover:opacity-95">
+        <Link
+          href="/policies/new"
+          className="rounded-md bg-[var(--primary)] px-4 py-2 text-sm font-semibold text-white hover:opacity-95"
+        >
           Add Policy
         </Link>
       </div>
@@ -62,41 +125,36 @@ export default async function PoliciesPage() {
             </tr>
           </thead>
           <tbody>
-            {policies.map((policy) => {
-              const primaryClient = policy.clients?.[0] ?? null;
-              const clientName =
-                primaryClient?.business_name ||
-                [primaryClient?.first_name, primaryClient?.last_name].filter(Boolean).join(" ") ||
-                "-";
-
-              return (
-                <tr key={policy.id} className="border-t border-[var(--border)]">
-                  <td className="px-4 py-3 text-slate-900">{clientName}</td>
-                  <td className="px-4 py-3 text-slate-700">{policy.carrier_name ?? "-"}</td>
-                  <td className="px-4 py-3 text-slate-700">{policy.policy_number ?? "-"}</td>
-                  <td className="px-4 py-3 text-slate-700">{policy.line_of_business ?? "-"}</td>
-                  <td className="px-4 py-3 text-slate-700">
-                    {policy.premium != null ? `$${policy.premium.toLocaleString()}` : "-"}
-                  </td>
-                  <td className="px-4 py-3 text-slate-700">{policy.status ?? "-"}</td>
-                  <td className="px-4 py-3 text-slate-700">{policy.effective_date ?? "-"}</td>
-                  <td className="px-4 py-3 text-slate-700">{policy.expiration_date ?? "-"}</td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-3">
-                      <Link href={`/policies/${policy.id}/edit`} className="font-medium text-[#2563eb]">
-                        Edit
-                      </Link>
-                      <form action={deletePolicy}>
-                        <input type="hidden" name="id" value={policy.id} />
-                        <button type="submit" className="text-sm font-medium text-rose-600">
-                          Delete
-                        </button>
-                      </form>
-                    </div>
-                  </td>
-                </tr>
-              );
-            })}
+            {policies.map((policy) => (
+              <tr key={policy.id} className="border-t border-[var(--border)]">
+                <td className="px-4 py-3 text-slate-900">{clientName(policy)}</td>
+                <td className="px-4 py-3 text-slate-700">{policy.carrier_name ?? "-"}</td>
+                <td className="px-4 py-3 text-slate-700">{policy.policy_number ?? "-"}</td>
+                <td className="px-4 py-3 text-slate-700">{policy.line_of_business ?? "-"}</td>
+                <td className="px-4 py-3 text-slate-700">
+                  {policy.premium != null ? `$${policy.premium.toLocaleString()}` : "-"}
+                </td>
+                <td className="px-4 py-3 text-slate-700">{policy.status ?? "-"}</td>
+                <td className="px-4 py-3 text-slate-700">{policy.effective_date ?? "-"}</td>
+                <td className="px-4 py-3 text-slate-700">{policy.expiration_date ?? "-"}</td>
+                <td className="px-4 py-3">
+                  <div className="flex items-center gap-3">
+                    <Link
+                      href={`/policies/${policy.id}/edit`}
+                      className="font-medium text-[var(--primary)]"
+                    >
+                      Edit
+                    </Link>
+                    <form action={deletePolicy}>
+                      <input type="hidden" name="id" value={policy.id} />
+                      <button type="submit" className="text-sm font-medium text-rose-600">
+                        Delete
+                      </button>
+                    </form>
+                  </div>
+                </td>
+              </tr>
+            ))}
             {policies.length === 0 ? (
               <tr>
                 <td colSpan={9} className="px-4 py-8 text-center text-slate-500">
