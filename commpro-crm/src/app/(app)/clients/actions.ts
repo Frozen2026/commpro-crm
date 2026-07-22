@@ -138,7 +138,8 @@ async function resolveAccountId(
 }
 
 /**
- * Resolve or create an agency. Never queries public.accounts.
+ * Resolve or create account + agency.
+ * Prefers SQL RPC (bypasses PostgREST schema cache for public.accounts).
  */
 async function ensureAccountAndAgency(
   userId: string,
@@ -146,7 +147,44 @@ async function ensureAccountAndAgency(
   preferredAgencyId: string | null,
 ) {
   const admin = getSupabaseAdmin();
-  const accountId = await resolveAccountId(admin, userId, preferredAccountId);
+
+  // 1) Preferred path: security-definer RPC in Postgres
+  {
+    const { data, error } = await admin.rpc("ensure_workspace_for_user", {
+      p_user_id: userId,
+    });
+
+    if (!error && data) {
+      const payload =
+        typeof data === "object" && data !== null
+          ? (data as { account_id?: string; agency_id?: string })
+          : null;
+      if (payload?.account_id && payload?.agency_id) {
+        return {
+          accountId: String(payload.account_id),
+          agencyId: String(payload.agency_id),
+        };
+      }
+    }
+
+    if (error) {
+      console.warn(
+        "[clients.ensureAccountAndAgency] RPC unavailable, falling back",
+        error.message,
+      );
+    }
+  }
+
+  // 2) Fallback without querying public.accounts via REST
+  let accountId: string;
+  try {
+    accountId = await resolveAccountId(admin, userId, preferredAccountId);
+  } catch (err) {
+    throw new Error(
+      `${err instanceof Error ? err.message : "Unable to resolve account_id."} ` +
+        "Also run SQL migration 20260722010000_ensure_workspace_for_user.sql in the Supabase SQL editor.",
+    );
+  }
 
   let agencyId = preferredAgencyId;
 
@@ -172,7 +210,6 @@ async function ensureAccountAndAgency(
     if (existingAgency?.id) {
       agencyId = String(existingAgency.id);
     } else {
-      // Env override for agency if create is blocked
       const envAgency =
         process.env.DEFAULT_AGENCY_ID?.trim() ||
         process.env.COI_INTAKE_AGENCY_ID?.trim() ||
@@ -192,7 +229,6 @@ async function ensureAccountAndAgency(
           .single();
 
         if (agencyError || !createdAgency?.id) {
-          // Last resort: any agency in the project
           const { data: anyAgency } = await admin
             .from("agencies")
             .select("id, account_id")
@@ -210,7 +246,7 @@ async function ensureAccountAndAgency(
 
           throw new Error(
             agencyError?.message ||
-              "Unable to create a default agency. Set DEFAULT_AGENCY_ID in the environment.",
+              "Unable to create a default agency. Run ensure_workspace_for_user SQL or set DEFAULT_AGENCY_ID.",
           );
         }
         agencyId = String(createdAgency.id);
@@ -218,7 +254,6 @@ async function ensureAccountAndAgency(
     }
   }
 
-  // Best-effort profile sync — ignore missing-table / RLS noise
   const { error: profileError } = await admin.from("agent_profiles").upsert(
     {
       id: userId,
