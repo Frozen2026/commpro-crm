@@ -137,9 +137,52 @@ async function resolveAccountId(
   );
 }
 
+function isMissingColumnError(message?: string | null) {
+  if (!message) return false;
+  const m = message.toLowerCase();
+  return (
+    m.includes("does not exist") ||
+    m.includes("could not find the") ||
+    m.includes("schema cache")
+  );
+}
+
+/** Load any agency row; tolerate agencies schemas that lack account_id. */
+async function findAnyAgency(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  admin: { from: (table: string) => any },
+): Promise<{ id: string; account_id?: string | null } | null> {
+  {
+    const { data, error } = await admin
+      .from("agencies")
+      .select("id, account_id")
+      .limit(1)
+      .maybeSingle();
+    if (!error && data?.id) {
+      return {
+        id: String(data.id),
+        account_id: data.account_id ? String(data.account_id) : null,
+      };
+    }
+    if (error && !isMissingColumnError(error.message)) {
+      console.warn("[clients.findAnyAgency]", error.message);
+    }
+  }
+
+  const { data, error } = await admin.from("agencies").select("id").limit(1).maybeSingle();
+  if (!error && data?.id) {
+    return { id: String(data.id), account_id: null };
+  }
+  if (error) {
+    console.warn("[clients.findAnyAgency] id-only", error.message);
+  }
+  return null;
+}
+
 /**
  * Resolve or create account + agency.
  * Prefers SQL RPC (bypasses PostgREST schema cache for public.accounts).
+ * Falls back to any existing agency when account_id column/RPC is missing.
  */
 async function ensureAccountAndAgency(
   userId: string,
@@ -175,18 +218,71 @@ async function ensureAccountAndAgency(
     }
   }
 
-  // 2) Fallback without querying public.accounts via REST
+  // 2) Prefer an agency that already exists (works even if account_id column is missing)
+  const existing = await findAnyAgency(admin);
+  if (existing?.id && (!preferredAgencyId || preferredAgencyId === existing.id)) {
+    let accountId = existing.account_id || preferredAccountId;
+    if (!accountId) {
+      try {
+        accountId = await resolveAccountId(admin, userId, preferredAccountId);
+      } catch {
+        accountId =
+          process.env.DEFAULT_ACCOUNT_ID?.trim() ||
+          process.env.COI_INTAKE_ACCOUNT_ID?.trim() ||
+          "";
+      }
+    }
+    if (accountId) {
+      return { accountId, agencyId: existing.id };
+    }
+    // Agency exists but no account id — still usable if clients.account_id is optional
+    return { accountId: preferredAccountId || "00000000-0000-4000-8000-000000000001", agencyId: existing.id };
+  }
+
+  if (preferredAgencyId) {
+    const { data: preferredAgency } = await admin
+      .from("agencies")
+      .select("id")
+      .eq("id", preferredAgencyId)
+      .maybeSingle();
+    if (preferredAgency?.id) {
+      let accountId = preferredAccountId;
+      try {
+        accountId = await resolveAccountId(admin, userId, preferredAccountId);
+      } catch {
+        accountId =
+          preferredAccountId ||
+          process.env.DEFAULT_ACCOUNT_ID?.trim() ||
+          process.env.COI_INTAKE_ACCOUNT_ID?.trim() ||
+          "00000000-0000-4000-8000-000000000001";
+      }
+      return { accountId, agencyId: String(preferredAgency.id) };
+    }
+  }
+
+  // 3) Resolve account, then find/create agency
   let accountId: string;
   try {
     accountId = await resolveAccountId(admin, userId, preferredAccountId);
   } catch (err) {
+    const anyAgency = existing ?? (await findAnyAgency(admin));
+    if (anyAgency?.id) {
+      return {
+        accountId:
+          anyAgency.account_id ||
+          process.env.DEFAULT_ACCOUNT_ID?.trim() ||
+          process.env.COI_INTAKE_ACCOUNT_ID?.trim() ||
+          "00000000-0000-4000-8000-000000000001",
+        agencyId: anyAgency.id,
+      };
+    }
     throw new Error(
       `${err instanceof Error ? err.message : "Unable to resolve account_id."} ` +
-        "Also run SQL migration 20260722040000_workspace_setup_no_declare.sql in the Supabase SQL editor.",
+        "Run the short ALTER script from the New Client page (or set DEFAULT_ACCOUNT_ID / DEFAULT_AGENCY_ID).",
     );
   }
 
-  let agencyId = preferredAgencyId;
+  let agencyId: string | null = preferredAgencyId;
 
   if (agencyId) {
     const { data: preferredAgency } = await admin
@@ -200,14 +296,14 @@ async function ensureAccountAndAgency(
   }
 
   if (!agencyId) {
-    const { data: existingAgency } = await admin
+    const { data: existingAgency, error: byAccountError } = await admin
       .from("agencies")
       .select("id")
       .eq("account_id", accountId)
       .limit(1)
       .maybeSingle();
 
-    if (existingAgency?.id) {
+    if (!byAccountError && existingAgency?.id) {
       agencyId = String(existingAgency.id);
     } else {
       const envAgency =
@@ -218,38 +314,54 @@ async function ensureAccountAndAgency(
       if (envAgency) {
         agencyId = envAgency;
       } else {
-        const { data: createdAgency, error: agencyError } = await admin
-          .from("agencies")
-          .insert({
-            account_id: accountId,
-            name: "Default Agency",
-            status: "active",
-          })
-          .select("id")
-          .single();
-
-        if (agencyError || !createdAgency?.id) {
-          const { data: anyAgency } = await admin
+        // Try insert with account_id, then without (column may be missing)
+        let createdId: string | null = null;
+        {
+          const { data: createdAgency, error: agencyError } = await admin
             .from("agencies")
-            .select("id, account_id")
-            .limit(1)
-            .maybeSingle();
+            .insert({
+              account_id: accountId,
+              name: "Default Agency",
+              status: "active",
+            })
+            .select("id")
+            .single();
+          if (!agencyError && createdAgency?.id) {
+            createdId = String(createdAgency.id);
+          } else if (agencyError) {
+            const { data: createdPlain, error: plainError } = await admin
+              .from("agencies")
+              .insert({
+                name: "Default Agency",
+                status: "active",
+              })
+              .select("id")
+              .single();
+            if (!plainError && createdPlain?.id) {
+              createdId = String(createdPlain.id);
+            } else {
+              console.warn(
+                "[clients.ensureAccountAndAgency] agency create failed",
+                agencyError?.message || plainError?.message,
+              );
+            }
+          }
+        }
 
+        if (createdId) {
+          agencyId = createdId;
+        } else {
+          const anyAgency = await findAnyAgency(admin);
           if (anyAgency?.id) {
             return {
-              accountId: anyAgency.account_id
-                ? String(anyAgency.account_id)
-                : accountId,
-              agencyId: String(anyAgency.id),
+              accountId: anyAgency.account_id || accountId,
+              agencyId: anyAgency.id,
             };
           }
-
           throw new Error(
-            agencyError?.message ||
-              "Unable to create a default agency. Run ensure_workspace_for_user SQL or set DEFAULT_AGENCY_ID.",
+            "Unable to create a default agency. Set DEFAULT_AGENCY_ID or run the short setup SQL on the New Client page.",
           );
         }
-        agencyId = String(createdAgency.id);
       }
     }
   }
@@ -327,19 +439,8 @@ export async function createClient(formData: FormData) {
     }
 
     if (error) {
+      // Always fall through — production may have a broken/partial RPC; TS path can recover.
       console.warn("[clients.createClient] create_client_for_user RPC failed", error.message);
-      // Fall through to legacy path if RPC not installed yet
-      if (!error.message.toLowerCase().includes("schema cache") &&
-          !error.message.toLowerCase().includes("could not find the function")) {
-        redirect(
-          `/clients/new?error=${encodeURIComponent(error.message)}&supabase_error=${encodeSupabaseErrorForQuery({
-            message: error.message,
-            code: error.code,
-            details: error.details,
-            hint: error.hint,
-          })}`,
-        );
-      }
     }
   }
 
@@ -365,9 +466,8 @@ export async function createClient(formData: FormData) {
     );
   }
 
-  const { error } = await admin.from("clients").insert({
+  const baseRow = {
     agency_id: agencyId,
-    account_id: accountId,
     owner_id: authenticatedUser.id,
     first_name: submittedValues.first_name,
     last_name: submittedValues.last_name,
@@ -378,7 +478,18 @@ export async function createClient(formData: FormData) {
     city: submittedValues.city,
     state: submittedValues.state,
     zip: submittedValues.zip,
+  };
+
+  let { error } = await admin.from("clients").insert({
+    ...baseRow,
+    account_id: accountId,
   });
+
+  // Retry without account_id when the column is missing or rejects the value
+  if (error && isMissingColumnError(error.message)) {
+    const retry = await admin.from("clients").insert(baseRow);
+    error = retry.error;
+  }
 
   if (error) {
     const supabaseError = {

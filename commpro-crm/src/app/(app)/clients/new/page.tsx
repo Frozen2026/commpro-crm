@@ -59,7 +59,8 @@ export default async function NewClientPage({ searchParams }: NewClientPageProps
     Boolean(errorMessage?.toLowerCase().includes("account_id")) ||
     Boolean(errorMessage?.toLowerCase().includes("schema cache")) ||
     Boolean(errorMessage?.toLowerCase().includes("create_client_for_user")) ||
-    Boolean(errorMessage?.toLowerCase().includes("workspace"));
+    Boolean(errorMessage?.toLowerCase().includes("workspace")) ||
+    Boolean(errorMessage?.toLowerCase().includes("agency"));
 
   return (
     <section className="mx-auto max-w-3xl space-y-6">
@@ -80,23 +81,22 @@ export default async function NewClientPage({ searchParams }: NewClientPageProps
       {errorMessage ? (
         <div className="space-y-3 rounded-md border border-rose-200 bg-rose-50 px-3 py-3 text-sm text-rose-800">
           <p>{errorMessage}</p>
-          {needsSqlSetup ? (
-            <div className="space-y-3 rounded border border-rose-200 bg-white/70 p-3 text-slate-800">
-              <p className="font-semibold">One-time database setup</p>
-              <ol className="list-decimal space-y-1 pl-5 text-sm">
-                <li>
-                  Click <strong>Copy setup SQL</strong> below
-                </li>
-                <li>
-                  In Supabase → SQL Editor, open a <strong>new blank</strong> query (discard any old
-                  pasted script)
-                </li>
-                <li>Paste → Run. Success shows a <code className="text-xs">workspace</code> JSON row</li>
-                <li>Return here and create the client again</li>
-              </ol>
-              <WorkspaceSetupSqlCopy />
-            </div>
-          ) : null}
+        </div>
+      ) : null}
+
+      {needsSqlSetup || errorMessage ? (
+        <div className="space-y-3 rounded-md border border-amber-200 bg-amber-50 p-3 text-slate-800">
+          <p className="font-semibold">Database setup (about 20 lines — no DECLARE)</p>
+          <ol className="list-decimal space-y-1 pl-5 text-sm">
+            <li>
+              Supabase → SQL Editor → <strong>New query</strong> (must be blank — close any tab that
+              errors at line 299)
+            </li>
+            <li>Copy the SQL below → paste → Run</li>
+            <li>You should see an account_id and agency_id row</li>
+            <li>Create the client again</li>
+          </ol>
+          <WorkspaceSetupSqlCopy />
         </div>
       ) : null}
 
