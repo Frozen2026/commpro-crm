@@ -3,7 +3,6 @@ import Link from "next/link";
 import { getUserContext } from "@/lib/account-context";
 import { clientMatchesQuery, loadClientsForContext } from "@/lib/clients-query";
 import { loadPoliciesForClient, loadRecentCoiCertificates } from "@/lib/coi";
-import { getSupabaseAdmin } from "@/lib/supabase/admin";
 
 type ClientRow = {
   id: string;
@@ -45,44 +44,30 @@ export default async function CoiRequestPage({
       .map((id) => id.trim())
       .filter(Boolean),
   );
+  const hasSearch = Boolean(companyName || phone || email);
 
   const context = await getUserContext();
-  const admin = getSupabaseAdmin();
 
-  let clients: ClientRow[] = [];
+  // Always load the full client list. Search is a soft filter for suggestions only —
+  // never hide the picker when clients exist (URL params from leads often don't match).
+  const { data: loaded, error: loadError } = await loadClientsForContext(
+    context,
+    "id, business_name, first_name, last_name, phone, email",
+  );
+  const allClients = (loaded as ClientRow[]) ?? [];
 
-  if (selectedClientId) {
-    const { data } = await admin
-      .from("clients")
-      .select("id, business_name, first_name, last_name, phone, email")
-      .eq("id", selectedClientId)
-      .maybeSingle();
-    if (data) {
-      clients = [data as ClientRow];
-    } else {
-      // Still show the full list so the user can pick another client
-      const { data: all } = await loadClientsForContext(
-        context,
-        "id, business_name, first_name, last_name, phone, email",
-      );
-      clients = all as ClientRow[];
-    }
-  } else {
-    const { data: all } = await loadClientsForContext(
-      context,
-      "id, business_name, first_name, last_name, phone, email",
-    );
-    let rows = all as ClientRow[];
-    if (companyName || phone || email) {
-      rows = rows.filter((client) =>
-        clientMatchesQuery(client, companyName, phone, email),
-      );
-    }
-    clients = rows.slice(0, 100);
-  }
+  const matchedClients = hasSearch
+    ? allClients.filter((client) => clientMatchesQuery(client, companyName, phone, email))
+    : allClients;
 
-  const activeClientId = selectedClientId || (clients.length === 1 ? clients[0].id : "");
-  const activeClient = clients.find((client) => client.id === activeClientId) ?? null;
+  const activeClientId =
+    (selectedClientId && allClients.some((c) => c.id === selectedClientId)
+      ? selectedClientId
+      : "") ||
+    (matchedClients.length === 1 ? matchedClients[0].id : "") ||
+    "";
+
+  const activeClient = allClients.find((client) => client.id === activeClientId) ?? null;
 
   const policies = activeClientId
     ? await loadPoliciesForClient(context, activeClientId, { activeOnly: false })
@@ -91,6 +76,15 @@ export default async function CoiRequestPage({
   const recentCertificates = activeClientId
     ? await loadRecentCoiCertificates(activeClientId)
     : [];
+
+  // Put matched clients first in the dropdown when searching
+  const dropdownClients =
+    hasSearch && matchedClients.length > 0
+      ? [
+          ...matchedClients,
+          ...allClients.filter((c) => !matchedClients.some((m) => m.id === c.id)),
+        ]
+      : allClients;
 
   return (
     <section className="space-y-4">
@@ -125,29 +119,51 @@ export default async function CoiRequestPage({
             className="w-full rounded-md border border-[var(--border)] px-3 py-2"
           />
         </label>
-        <button
-          type="submit"
-          className="w-fit rounded-md bg-[var(--primary)] px-4 py-2 text-sm font-semibold text-white hover:opacity-95"
-        >
-          Search
-        </button>
+        <div className="flex flex-wrap items-center gap-3">
+          <button
+            type="submit"
+            className="w-fit rounded-md bg-[var(--primary)] px-4 py-2 text-sm font-semibold text-white hover:opacity-95"
+          >
+            Search
+          </button>
+          {hasSearch || selectedClientId ? (
+            <Link href="/coi" className="text-sm font-medium text-[var(--primary)] hover:underline">
+              Clear search
+            </Link>
+          ) : null}
+        </div>
       </form>
 
-      {clients.length > 0 ? (
+      {hasSearch && allClients.length > 0 && matchedClients.length === 0 ? (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          No clients matched that search. Pick a client from the full list below, or{" "}
+          <Link href="/coi" className="font-medium underline">
+            clear search
+          </Link>
+          .
+        </div>
+      ) : null}
+
+      {allClients.length > 0 ? (
         <div className="space-y-4 rounded-xl border border-[var(--border)] bg-white p-6">
           <form className="space-y-2">
             <input type="hidden" name="company_name" value={companyName} />
             <input type="hidden" name="phone" value={phone} />
             <input type="hidden" name="email" value={email} />
             <label className="space-y-1 text-sm">
-              <span className="font-medium text-slate-700">Client</span>
+              <span className="font-medium text-slate-700">
+                Client
+                {hasSearch && matchedClients.length > 0
+                  ? ` (${matchedClients.length} match${matchedClients.length === 1 ? "" : "es"} · ${allClients.length} total)`
+                  : ` (${allClients.length})`}
+              </span>
               <select
                 name="client_id"
                 defaultValue={activeClientId}
                 className="w-full rounded-md border border-[var(--border)] px-3 py-2"
               >
                 <option value="">Select a client</option>
-                {clients.map((client) => (
+                {dropdownClients.map((client) => (
                   <option key={client.id} value={client.id}>
                     {clientLabel(client)}
                     {client.email ? ` · ${client.email}` : ""}
@@ -280,9 +296,9 @@ export default async function CoiRequestPage({
         </div>
       ) : (
         <div className="rounded-xl border border-[var(--border)] bg-white p-6 text-sm text-slate-500">
-          {companyName || phone || email || selectedClientId
-            ? "No matching clients found."
-            : "No clients in the system yet."}{" "}
+          {loadError
+            ? `Could not load clients (${loadError.message}). `
+            : "No clients in the system yet. "}
           <Link href="/clients/new" className="font-medium text-[var(--primary)]">
             Create a client
           </Link>
