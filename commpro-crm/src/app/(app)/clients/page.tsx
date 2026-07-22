@@ -65,12 +65,18 @@ export default async function ClientsPage() {
                   {client.created_at ? new Date(client.created_at).toLocaleDateString() : "-"}
                 </td>
                 <td className="px-4 py-3">
-                  <div className="flex items-center gap-3">
+                  <div className="flex flex-wrap items-center gap-3">
                     <Link
                       href={`/clients/${client.id}/edit`}
                       className="font-medium text-[var(--primary)]"
                     >
                       Edit
+                    </Link>
+                    <Link
+                      href={`/coi?client_id=${client.id}`}
+                      className="font-medium text-[var(--primary)]"
+                    >
+                      Issue COI
                     </Link>
                     <form action={deleteClient}>
                       <input type="hidden" name="id" value={client.id} />

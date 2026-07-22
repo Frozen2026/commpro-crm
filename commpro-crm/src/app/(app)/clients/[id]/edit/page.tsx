@@ -47,11 +47,19 @@ export default async function EditClientPage({ params }: { params: Promise<{ id:
 
   return (
     <section className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-2xl font-bold tracking-tight text-slate-900">Edit Client</h2>
-        <Link href="/clients" className="text-sm font-medium text-[var(--primary)]">
-          Back to Clients
-        </Link>
+        <div className="flex flex-wrap items-center gap-3">
+          <Link
+            href={`/coi?client_id=${client.id}`}
+            className="rounded-md bg-[var(--primary)] px-3 py-1.5 text-sm font-medium text-white"
+          >
+            Issue COI
+          </Link>
+          <Link href="/clients" className="text-sm font-medium text-[var(--primary)]">
+            Back to Clients
+          </Link>
+        </div>
       </div>
       <ClientForm values={client} />
     </section>
