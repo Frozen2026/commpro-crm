@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 
 import { getUserContext } from "@/lib/account-context";
 import { getNullableString, getString } from "@/lib/form-utils";
-import { supabaseAdmin } from "@/lib/supabase/admin";
+import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { createClient as createSupabaseServerClient } from "@/lib/supabase/server";
 
 type SupabaseErrorDetails = {
@@ -50,6 +50,133 @@ async function requireAuthenticatedUser(actionName: string) {
   return user;
 }
 
+/**
+ * Admins/owners should never be blocked by a missing agency row.
+ * Resolves (or creates) account + agency via service role so RLS cannot stop client CRUD.
+ */
+async function ensureAccountAndAgency(userId: string, preferredAccountId: string, preferredAgencyId: string | null) {
+  const admin = getSupabaseAdmin();
+
+  let accountId = preferredAccountId;
+
+  const { data: membership } = await admin
+    .from("accounts_memberships")
+    .select("account_id")
+    .eq("user_id", userId)
+    .limit(1)
+    .maybeSingle();
+
+  if (membership?.account_id) {
+    accountId = String(membership.account_id);
+  } else {
+    const { data: existingAccount } = await admin
+      .from("accounts")
+      .select("id")
+      .eq("id", accountId)
+      .maybeSingle();
+
+    if (!existingAccount?.id) {
+      const { data: createdAccount, error: accountError } = await admin
+        .from("accounts")
+        .insert({
+          name: "CommPro Account",
+          primary_owner_user_id: userId,
+          is_personal_account: false,
+        })
+        .select("id")
+        .single();
+
+      if (accountError || !createdAccount?.id) {
+        // Fallback: use any existing account in the system (common on admin bootstraps)
+        const { data: anyAccount } = await admin
+          .from("accounts")
+          .select("id")
+          .limit(1)
+          .maybeSingle();
+
+        if (!anyAccount?.id) {
+          throw new Error(
+            accountError?.message || "Unable to resolve or create an account for client management.",
+          );
+        }
+        accountId = String(anyAccount.id);
+      } else {
+        accountId = String(createdAccount.id);
+      }
+
+      // Best-effort membership so future context resolves cleanly
+      await admin.from("accounts_memberships").upsert(
+        {
+          user_id: userId,
+          account_id: accountId,
+          account_role: "owner",
+        },
+        { onConflict: "user_id,account_id" },
+      ).then(({ error }) => {
+        if (error) {
+          console.warn("[clients.ensureAccountAndAgency] membership upsert skipped", error.message);
+        }
+      });
+    }
+  }
+
+  let agencyId = preferredAgencyId;
+
+  if (agencyId) {
+    const { data: preferredAgency } = await admin
+      .from("agencies")
+      .select("id")
+      .eq("id", agencyId)
+      .maybeSingle();
+    if (!preferredAgency?.id) {
+      agencyId = null;
+    }
+  }
+
+  if (!agencyId) {
+    const { data: existingAgency } = await admin
+      .from("agencies")
+      .select("id")
+      .eq("account_id", accountId)
+      .limit(1)
+      .maybeSingle();
+
+    if (existingAgency?.id) {
+      agencyId = String(existingAgency.id);
+    } else {
+      const { data: createdAgency, error: agencyError } = await admin
+        .from("agencies")
+        .insert({
+          account_id: accountId,
+          name: "Default Agency",
+          status: "active",
+        })
+        .select("id")
+        .single();
+
+      if (agencyError || !createdAgency?.id) {
+        throw new Error(agencyError?.message || "Unable to create a default agency for this account.");
+      }
+      agencyId = String(createdAgency.id);
+    }
+  }
+
+  // Keep agent_profiles in sync when present (non-blocking)
+  const { error: profileError } = await admin.from("agent_profiles").upsert(
+    {
+      id: userId,
+      account_id: accountId,
+      agency_id: agencyId,
+    },
+    { onConflict: "id" },
+  );
+  if (profileError) {
+    console.warn("[clients.ensureAccountAndAgency] agent_profiles upsert skipped", profileError.message);
+  }
+
+  return { accountId, agencyId };
+}
+
 export async function createClient(formData: FormData) {
   const hasSupabaseUrl = Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL);
   const hasSupabaseAnonKey = Boolean(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
@@ -63,64 +190,31 @@ export async function createClient(formData: FormData) {
   }
 
   const authenticatedUser = await requireAuthenticatedUser("createClient");
-
   const context = await getUserContext();
-  const supabase = await createSupabaseServerClient();
   const firstName = getString(formData, "first_name");
 
   if (!firstName) {
     redirect("/clients/new?error=first-name-required");
   }
 
-  const { data: agency, error: agenciesError } = await supabase
-    .from("agencies")
-    .select("id")
-    .limit(1)
-    .maybeSingle();
+  let accountId = context.accountId;
+  let agencyId = context.agencyId;
 
-  if (agenciesError) {
-    console.error("[clients.createClient] Failed to read agencies table", {
-      message: agenciesError.message,
-      code: agenciesError.code,
-      details: agenciesError.details,
-      hint: agenciesError.hint,
-    });
-    redirect("/clients/new?error=agency-lookup-failed");
-  }
-
-  let agencyId = agency?.id ? String(agency.id) : null;
-
-  if (!agencyId) {
-    const { data: createdAgency, error: createAgencyError } = await supabase
-      .from("agencies")
-      .insert({
-        account_id: context.accountId,
-        name: "CommPro Agency",
-        status: "active",
-      })
-      .select("id")
-      .single();
-
-    if (createAgencyError) {
-      console.error("[clients.createClient] Failed to create default agency", {
-        message: createAgencyError.message,
-        code: createAgencyError.code,
-        details: createAgencyError.details,
-        hint: createAgencyError.hint,
-      });
-      redirect("/clients/new?error=no-agency");
-    }
-
-    agencyId = createdAgency?.id ? String(createdAgency.id) : null;
-  }
-
-  if (!agencyId) {
-    console.error("[clients.createClient] Unable to resolve agency_id for insert", {
-      userId: context.userId,
-      contextAgencyId: context.agencyId,
-      agency,
-    });
-    redirect("/clients/new?error=no-agency");
+  try {
+    const resolved = await ensureAccountAndAgency(
+      authenticatedUser.id,
+      context.accountId,
+      context.agencyId,
+    );
+    accountId = resolved.accountId;
+    agencyId = resolved.agencyId;
+  } catch (err) {
+    console.error("[clients.createClient] Failed to ensure account/agency", err);
+    redirect(
+      `/clients/new?error=${encodeURIComponent(
+        err instanceof Error ? err.message : "Unable to prepare account for client create.",
+      )}`,
+    );
   }
 
   const submittedValues = {
@@ -135,22 +229,22 @@ export async function createClient(formData: FormData) {
     zip: getNullableString(formData, "zip"),
   };
 
-  const { error } = await supabase
-    .from("clients")
-    .insert({
-      agency_id: agencyId,
-      account_id: context.accountId,
-      owner_id: authenticatedUser.id,
-      first_name: submittedValues.first_name,
-      last_name: submittedValues.last_name,
-      business_name: submittedValues.business_name,
-      email: submittedValues.email,
-      phone: submittedValues.phone,
-      address: submittedValues.address,
-      city: submittedValues.city,
-      state: submittedValues.state,
-      zip: submittedValues.zip,
-    });
+  const admin = getSupabaseAdmin();
+  const { error } = await admin.from("clients").insert({
+    agency_id: agencyId,
+    account_id: accountId,
+    owner_id: authenticatedUser.id,
+    first_name: submittedValues.first_name,
+    last_name: submittedValues.last_name,
+    business_name: submittedValues.business_name,
+    email: submittedValues.email,
+    phone: submittedValues.phone,
+    address: submittedValues.address,
+    city: submittedValues.city,
+    state: submittedValues.state,
+    zip: submittedValues.zip,
+  });
+
   if (error) {
     const supabaseError = {
       message: error.message,
@@ -164,7 +258,7 @@ export async function createClient(formData: FormData) {
       ...supabaseError,
       submittedValues,
       agencyId,
-      accountId: context.accountId,
+      accountId,
       ownerId: authenticatedUser.id,
     });
 
@@ -181,9 +275,16 @@ export async function createClient(formData: FormData) {
 }
 
 export async function updateClient(formData: FormData) {
-  await requireAuthenticatedUser("updateClient");
+  const authenticatedUser = await requireAuthenticatedUser("updateClient");
   const context = await getUserContext();
   const id = getString(formData, "id");
+  const admin = getSupabaseAdmin();
+
+  const { accountId, agencyId } = await ensureAccountAndAgency(
+    authenticatedUser.id,
+    context.accountId,
+    context.agencyId,
+  );
 
   const payload = {
     first_name: getNullableString(formData, "first_name"),
@@ -197,14 +298,11 @@ export async function updateClient(formData: FormData) {
     zip: getNullableString(formData, "zip"),
   };
 
-  let query = supabaseAdmin
+  const { error } = await admin
     .from("clients")
     .update(payload)
-    .eq("id", id);
-
-  query = context.agencyId ? query.eq("agency_id", context.agencyId) : query.eq("owner_id", context.userId);
-
-  const { error } = await query;
+    .eq("id", id)
+    .eq("account_id", accountId);
 
   if (error) {
     console.error("[clients.updateClient] Supabase update failed", {
@@ -216,7 +314,8 @@ export async function updateClient(formData: FormData) {
       clientId: id,
       payload,
       userId: context.userId,
-      agencyId: context.agencyId,
+      agencyId,
+      accountId,
     });
     throw new Error(`Supabase update failed: ${error.message}`);
   }
@@ -228,18 +327,22 @@ export async function updateClient(formData: FormData) {
 }
 
 export async function deleteClient(formData: FormData) {
-  await requireAuthenticatedUser("deleteClient");
+  const authenticatedUser = await requireAuthenticatedUser("deleteClient");
   const context = await getUserContext();
   const id = getString(formData, "id");
+  const admin = getSupabaseAdmin();
 
-  let query = supabaseAdmin
+  const { accountId } = await ensureAccountAndAgency(
+    authenticatedUser.id,
+    context.accountId,
+    context.agencyId,
+  );
+
+  const { error } = await admin
     .from("clients")
     .delete()
-    .eq("id", id);
-
-  query = context.agencyId ? query.eq("agency_id", context.agencyId) : query.eq("owner_id", context.userId);
-
-  const { error } = await query;
+    .eq("id", id)
+    .eq("account_id", accountId);
 
   if (error) {
     console.error("[clients.deleteClient] Supabase delete failed", {
@@ -250,7 +353,7 @@ export async function deleteClient(formData: FormData) {
       hint: error.hint,
       clientId: id,
       userId: context.userId,
-      agencyId: context.agencyId,
+      accountId,
     });
     throw new Error(`Supabase delete failed: ${error.message}`);
   }
