@@ -8,8 +8,8 @@ import { getSupabaseAdmin } from "@/lib/supabase/admin";
 type ClientRow = {
   id: string;
   business_name: string | null;
-  first_name?: string | null;
-  last_name?: string | null;
+  first_name: string | null;
+  last_name: string | null;
   phone: string | null;
   email: string | null;
 };
