@@ -4,21 +4,26 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { getUserContext } from "@/lib/account-context";
+import { isMissingColumnError } from "@/lib/clients-query";
 import { getNullableNumber, getNullableString, getString } from "@/lib/form-utils";
-import { createClient } from "@/lib/supabase/server";
+import { getSupabaseAdmin } from "@/lib/supabase/admin";
 
 export async function createPolicy(formData: FormData) {
-  const supabase = await createClient();
   const context = await getUserContext();
+  const admin = getSupabaseAdmin();
 
   if (!context.agencyId) {
     throw new Error("No agency is configured for this account.");
   }
 
-  const payload = {
-    account_id: context.accountId,
+  const clientId = getString(formData, "client_id");
+  if (!clientId) {
+    throw new Error("Client is required.");
+  }
+
+  const basePayload = {
     agency_id: context.agencyId,
-    client_id: getString(formData, "client_id"),
+    client_id: clientId,
     carrier_name: getString(formData, "carrier_name"),
     policy_number: getNullableString(formData, "policy_number"),
     line_of_business: getString(formData, "line_of_business"),
@@ -28,7 +33,16 @@ export async function createPolicy(formData: FormData) {
     expiration_date: getNullableString(formData, "expiration_date"),
   };
 
-  const { error } = await supabase.from("policies").insert(payload);
+  let { error } = await admin.from("policies").insert({
+    ...basePayload,
+    account_id: context.accountId,
+  });
+
+  if (error && isMissingColumnError(error.message)) {
+    const retry = await admin.from("policies").insert(basePayload);
+    error = retry.error;
+  }
+
   if (error) {
     throw new Error(error.message);
   }
@@ -39,8 +53,8 @@ export async function createPolicy(formData: FormData) {
 }
 
 export async function updatePolicy(formData: FormData) {
-  const supabase = await createClient();
   const context = await getUserContext();
+  const admin = getSupabaseAdmin();
   const id = getString(formData, "id");
 
   const payload = {
@@ -54,11 +68,20 @@ export async function updatePolicy(formData: FormData) {
     expiration_date: getNullableString(formData, "expiration_date"),
   };
 
-  const { error } = await supabase
+  let { error } = await admin
     .from("policies")
     .update(payload)
     .eq("id", id)
     .eq("account_id", context.accountId);
+
+  if (error && isMissingColumnError(error.message)) {
+    let q = admin.from("policies").update(payload).eq("id", id);
+    if (context.agencyId) {
+      q = q.eq("agency_id", context.agencyId);
+    }
+    const retry = await q;
+    error = retry.error;
+  }
 
   if (error) {
     throw new Error(error.message);
@@ -70,15 +93,24 @@ export async function updatePolicy(formData: FormData) {
 }
 
 export async function deletePolicy(formData: FormData) {
-  const supabase = await createClient();
   const context = await getUserContext();
+  const admin = getSupabaseAdmin();
   const id = getString(formData, "id");
 
-  const { error } = await supabase
+  let { error } = await admin
     .from("policies")
     .delete()
     .eq("id", id)
     .eq("account_id", context.accountId);
+
+  if (error && isMissingColumnError(error.message)) {
+    let q = admin.from("policies").delete().eq("id", id);
+    if (context.agencyId) {
+      q = q.eq("agency_id", context.agencyId);
+    }
+    const retry = await q;
+    error = retry.error;
+  }
 
   if (error) {
     throw new Error(error.message);

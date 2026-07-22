@@ -3,91 +3,9 @@ import Link from "next/link";
 import { deleteClient } from "@/app/(app)/clients/actions";
 import { ErrorConsoleLogger } from "@/app/(app)/clients/new/error-console-logger";
 import { getUserContext } from "@/lib/account-context";
-import { getSupabaseAdmin } from "@/lib/supabase/admin";
+import { loadClientsForContext, type ClientListRow } from "@/lib/clients-query";
 
-type ClientRow = {
-  id: string;
-  first_name: string | null;
-  last_name: string | null;
-  business_name: string | null;
-  email: string | null;
-  phone: string | null;
-  city: string | null;
-  state: string | null;
-  created_at: string | null;
-};
-
-const CLIENT_LIST_COLUMNS =
-  "id, first_name, last_name, business_name, email, phone, city, state, created_at";
-
-function isMissingColumnError(message?: string | null) {
-  if (!message) return false;
-  const m = message.toLowerCase();
-  return m.includes("does not exist") || m.includes("could not find the");
-}
-
-/**
- * Load clients visible to this user.
- * Production often lacks clients.account_id — fall back to agency_id / owner_id.
- * Uses service role so drifted RLS does not hide rows the user just created.
- */
-async function loadClients(context: {
-  userId: string;
-  accountId: string;
-  agencyId: string | null;
-}) {
-  const admin = getSupabaseAdmin();
-
-  // 1) Preferred: account-scoped (MakerKit / full schema)
-  {
-    const { data, error } = await admin
-      .from("clients")
-      .select(CLIENT_LIST_COLUMNS)
-      .eq("account_id", context.accountId)
-      .order("created_at", { ascending: false });
-
-    if (!error) {
-      return { data: (data ?? []) as ClientRow[], error: null };
-    }
-
-    if (!isMissingColumnError(error.message)) {
-      console.error("[clients.page] account-scoped select failed", error.message);
-      return { data: [] as ClientRow[], error };
-    }
-  }
-
-  // 2) Agency-scoped (production drift: no account_id column)
-  if (context.agencyId) {
-    const { data, error } = await admin
-      .from("clients")
-      .select(CLIENT_LIST_COLUMNS)
-      .eq("agency_id", context.agencyId)
-      .order("created_at", { ascending: false });
-
-    if (!error) {
-      return { data: (data ?? []) as ClientRow[], error: null };
-    }
-    console.error("[clients.page] agency-scoped select failed", error.message);
-  }
-
-  // 3) Owner-scoped
-  {
-    const { data, error } = await admin
-      .from("clients")
-      .select(CLIENT_LIST_COLUMNS)
-      .eq("owner_id", context.userId)
-      .order("created_at", { ascending: false });
-
-    if (!error) {
-      return { data: (data ?? []) as ClientRow[], error: null };
-    }
-
-    console.error("[clients.page] owner-scoped select failed", error.message);
-    return { data: [] as ClientRow[], error };
-  }
-}
-
-function displayName(client: ClientRow) {
+function displayName(client: ClientListRow) {
   if (client.business_name?.trim()) return client.business_name;
   const person = [client.first_name, client.last_name].filter(Boolean).join(" ").trim();
   return person || "-";
@@ -95,7 +13,7 @@ function displayName(client: ClientRow) {
 
 export default async function ClientsPage() {
   const context = await getUserContext();
-  const { data: clients, error } = await loadClients(context);
+  const { data: clients, error } = await loadClientsForContext(context);
 
   const supabaseError = error
     ? {
