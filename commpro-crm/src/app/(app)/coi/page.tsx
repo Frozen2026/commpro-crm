@@ -1,7 +1,7 @@
 import Link from "next/link";
 
 import { getUserContext } from "@/lib/account-context";
-import { loadClientsForContext } from "@/lib/clients-query";
+import { clientMatchesQuery, loadClientsForContext } from "@/lib/clients-query";
 import { loadPoliciesForClient, loadRecentCoiCertificates } from "@/lib/coi";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 
@@ -59,23 +59,26 @@ export default async function CoiRequestPage({
       .maybeSingle();
     if (data) {
       clients = [data as ClientRow];
+    } else {
+      // Still show the full list so the user can pick another client
+      const { data: all } = await loadClientsForContext(
+        context,
+        "id, business_name, first_name, last_name, phone, email",
+      );
+      clients = all as ClientRow[];
     }
-  } else if (companyName) {
-    const { data: all } = await loadClientsForContext(
-      context,
-      "id, business_name, first_name, last_name, phone, email",
-    );
-    const q = companyName.toLowerCase();
-    clients = all.filter((client) => {
-      const label = clientLabel(client as ClientRow).toLowerCase();
-      return label.includes(q);
-    }).slice(0, 20) as ClientRow[];
   } else {
     const { data: all } = await loadClientsForContext(
       context,
       "id, business_name, first_name, last_name, phone, email",
     );
-    clients = (all as ClientRow[]).slice(0, 50);
+    let rows = all as ClientRow[];
+    if (companyName || phone || email) {
+      rows = rows.filter((client) =>
+        clientMatchesQuery(client, companyName, phone, email),
+      );
+    }
+    clients = rows.slice(0, 100);
   }
 
   const activeClientId = selectedClientId || (clients.length === 1 ? clients[0].id : "");
@@ -275,17 +278,15 @@ export default async function CoiRequestPage({
             </div>
           ) : null}
         </div>
-      ) : companyName || selectedClientId ? (
+      ) : (
         <div className="rounded-xl border border-[var(--border)] bg-white p-6 text-sm text-slate-500">
-          No matching clients found.{" "}
+          {companyName || phone || email || selectedClientId
+            ? "No matching clients found."
+            : "No clients in the system yet."}{" "}
           <Link href="/clients/new" className="font-medium text-[var(--primary)]">
             Create a client
           </Link>
-          .
-        </div>
-      ) : (
-        <div className="rounded-xl border border-dashed border-[var(--border)] bg-white p-6 text-sm text-slate-500">
-          Search for a client, or open <strong>Issue COI</strong> from a client or policy page.
+          , then return here or use <strong>Issue COI</strong> from the client page.
         </div>
       )}
     </section>
