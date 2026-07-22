@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import { ClientForm } from "@/app/(app)/clients/client-form";
 import { ErrorConsoleLogger } from "@/app/(app)/clients/new/error-console-logger";
+import { WorkspaceSetupSqlCopy } from "@/app/(app)/clients/new/workspace-setup-sql-copy";
 
 type NewClientPageProps = {
   searchParams?: Promise<{
@@ -57,7 +58,9 @@ export default async function NewClientPage({ searchParams }: NewClientPageProps
     Boolean(errorMessage?.toLowerCase().includes("sql")) ||
     Boolean(errorMessage?.toLowerCase().includes("account_id")) ||
     Boolean(errorMessage?.toLowerCase().includes("schema cache")) ||
-    Boolean(errorMessage?.toLowerCase().includes("create_client_for_user"));
+    Boolean(errorMessage?.toLowerCase().includes("create_client_for_user")) ||
+    Boolean(errorMessage?.toLowerCase().includes("workspace")) ||
+    Boolean(errorMessage?.toLowerCase().includes("agency"));
 
   return (
     <section className="mx-auto max-w-3xl space-y-6">
@@ -78,31 +81,22 @@ export default async function NewClientPage({ searchParams }: NewClientPageProps
       {errorMessage ? (
         <div className="space-y-3 rounded-md border border-rose-200 bg-rose-50 px-3 py-3 text-sm text-rose-800">
           <p>{errorMessage}</p>
-          {needsSqlSetup ? (
-            <div className="rounded border border-rose-200 bg-white/70 p-3 text-slate-800">
-              <p className="font-semibold">One-time database setup</p>
-              <ol className="mt-2 list-decimal space-y-1 pl-5">
-                <li>Open your Supabase project → SQL Editor</li>
-                <li>
-                  Paste and run the full contents of{" "}
-                  <code className="text-xs">20260722030000_fix_agency_account_id_rpc.sql</code>
-                </li>
-                <li>Confirm the notice says &quot;Workspace ready&quot;</li>
-                <li>Return here and create the client again</li>
-              </ol>
-              <p className="mt-2 text-xs text-slate-600">
-                Raw file:{" "}
-                <a
-                  className="font-medium text-[var(--primary)] underline"
-                  href="https://raw.githubusercontent.com/Frozen2026/commpro-crm/main/apps/web/supabase/migrations/20260722030000_fix_agency_account_id_rpc.sql"
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  open SQL on GitHub
-                </a>
-              </p>
-            </div>
-          ) : null}
+        </div>
+      ) : null}
+
+      {needsSqlSetup || errorMessage ? (
+        <div className="space-y-3 rounded-md border border-amber-200 bg-amber-50 p-3 text-slate-800">
+          <p className="font-semibold">Database setup (about 20 lines — no DECLARE)</p>
+          <ol className="list-decimal space-y-1 pl-5 text-sm">
+            <li>
+              Supabase → SQL Editor → <strong>New query</strong> (must be blank — close any tab that
+              errors at line 299)
+            </li>
+            <li>Copy the SQL below → paste → Run</li>
+            <li>You should see an account_id and agency_id row</li>
+            <li>Create the client again</li>
+          </ol>
+          <WorkspaceSetupSqlCopy />
         </div>
       ) : null}
 
