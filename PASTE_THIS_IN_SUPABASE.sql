@@ -1,4 +1,3 @@
--- Prefer 20260722040000_workspace_setup_no_declare.sql (identical body).
 -- CommPro workspace setup (SQL Editor safe: no DO blocks, no nested dollar-quotes, no plpgsql variable sections).
 -- Paste ENTIRE file into a blank Supabase SQL Editor tab, then Run.
 -- Success = one row with a workspace JSON object.

@@ -182,7 +182,7 @@ async function ensureAccountAndAgency(
   } catch (err) {
     throw new Error(
       `${err instanceof Error ? err.message : "Unable to resolve account_id."} ` +
-        "Also run SQL migration 20260722010000_ensure_workspace_for_user.sql in the Supabase SQL editor.",
+        "Also run SQL migration 20260722040000_workspace_setup_no_declare.sql in the Supabase SQL editor.",
     );
   }
 
@@ -360,7 +360,7 @@ export async function createClient(formData: FormData) {
     console.error("[clients.createClient] Failed to ensure account/agency", err);
     redirect(
       `/clients/new?error=${encodeURIComponent(
-        "Database setup required: open Supabase → SQL Editor and run 20260722030000_fix_agency_account_id_rpc.sql, then try again.",
+        "Database setup required: open Supabase → SQL Editor and run PASTE_THIS_IN_SUPABASE.sql (or 20260722040000_workspace_setup_no_declare.sql), then try again.",
       )}`,
     );
   }

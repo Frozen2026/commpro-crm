@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import { ClientForm } from "@/app/(app)/clients/client-form";
 import { ErrorConsoleLogger } from "@/app/(app)/clients/new/error-console-logger";
+import { WorkspaceSetupSqlCopy } from "@/app/(app)/clients/new/workspace-setup-sql-copy";
 
 type NewClientPageProps = {
   searchParams?: Promise<{
@@ -57,7 +58,8 @@ export default async function NewClientPage({ searchParams }: NewClientPageProps
     Boolean(errorMessage?.toLowerCase().includes("sql")) ||
     Boolean(errorMessage?.toLowerCase().includes("account_id")) ||
     Boolean(errorMessage?.toLowerCase().includes("schema cache")) ||
-    Boolean(errorMessage?.toLowerCase().includes("create_client_for_user"));
+    Boolean(errorMessage?.toLowerCase().includes("create_client_for_user")) ||
+    Boolean(errorMessage?.toLowerCase().includes("workspace"));
 
   return (
     <section className="mx-auto max-w-3xl space-y-6">
@@ -79,27 +81,20 @@ export default async function NewClientPage({ searchParams }: NewClientPageProps
         <div className="space-y-3 rounded-md border border-rose-200 bg-rose-50 px-3 py-3 text-sm text-rose-800">
           <p>{errorMessage}</p>
           {needsSqlSetup ? (
-            <div className="rounded border border-rose-200 bg-white/70 p-3 text-slate-800">
+            <div className="space-y-3 rounded border border-rose-200 bg-white/70 p-3 text-slate-800">
               <p className="font-semibold">One-time database setup</p>
-              <ol className="mt-2 list-decimal space-y-1 pl-5">
-                <li>Open your Supabase project → SQL Editor</li>
+              <ol className="list-decimal space-y-1 pl-5 text-sm">
                 <li>
-                  Paste and run the full contents of the SQL file linked below (entire file, one run)
+                  Click <strong>Copy setup SQL</strong> below
                 </li>
-                <li>Confirm the result returns a <code className="text-xs">workspace</code> JSON row</li>
+                <li>
+                  In Supabase → SQL Editor, open a <strong>new blank</strong> query (discard any old
+                  pasted script)
+                </li>
+                <li>Paste → Run. Success shows a <code className="text-xs">workspace</code> JSON row</li>
                 <li>Return here and create the client again</li>
               </ol>
-              <p className="mt-2 text-xs text-slate-600">
-                Raw file:{" "}
-                <a
-                  className="font-medium text-[var(--primary)] underline"
-                  href="https://raw.githubusercontent.com/Frozen2026/commpro-crm/cursor/fix-sql-editor-declare-ff54/apps/web/supabase/migrations/20260722030000_fix_agency_account_id_rpc.sql"
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  open SQL on GitHub
-                </a>
-              </p>
+              <WorkspaceSetupSqlCopy />
             </div>
           ) : null}
         </div>
