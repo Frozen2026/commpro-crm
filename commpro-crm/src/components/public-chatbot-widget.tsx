@@ -63,7 +63,7 @@ export function PublicChatbotWidget() {
     <div className="fixed bottom-5 right-5 z-50 sm:bottom-6 sm:right-6">
       {open ? (
         <section className="w-[calc(100vw-2rem)] max-w-sm overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_24px_80px_rgba(15,23,42,0.24)]">
-          <div className="flex items-center justify-between border-b border-slate-200 bg-slate-950 px-4 py-3 text-white">
+          <div className="flex items-center justify-between border-b border-[var(--border)] bg-[var(--steel-dark)] px-4 py-3 text-white">
             <div className="flex items-center gap-3">
               <div className="flex h-9 w-9 items-center justify-center rounded-2xl bg-white/10">
                 <Bot className="h-4 w-4" />
@@ -88,7 +88,9 @@ export function PublicChatbotWidget() {
               <div key={`${message.role}-${index}`} className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}>
                 <div
                   className={`max-w-[85%] rounded-2xl px-3 py-2 text-sm leading-6 ${
-                    message.role === "user" ? "bg-slate-950 text-white" : "border border-slate-200 bg-slate-50 text-slate-800"
+                    message.role === "user"
+                      ? "bg-[var(--steel)] text-white"
+                      : "border border-[var(--border)] bg-[var(--steel-pale)] text-[var(--foreground)]"
                   }`}
                 >
                   {message.content}
@@ -125,7 +127,7 @@ export function PublicChatbotWidget() {
             />
             <button
               type="submit"
-              className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-slate-950 text-white transition hover:bg-slate-800"
+              className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-[var(--accent)] text-[var(--steel-dark)] transition hover:bg-[var(--accent-dark)]"
               aria-label="Send message"
             >
               <Send className="h-4 w-4" />
@@ -136,7 +138,7 @@ export function PublicChatbotWidget() {
         <button
           type="button"
           onClick={() => setOpen(true)}
-          className="inline-flex items-center gap-3 rounded-full bg-slate-950 px-4 py-3 text-sm font-semibold text-white shadow-[0_18px_50px_rgba(15,23,42,0.3)] transition hover:-translate-y-0.5 hover:bg-slate-800"
+          className="inline-flex items-center gap-3 rounded-full bg-[var(--steel-dark)] px-4 py-3 text-sm font-semibold text-white shadow-[0_18px_50px_rgba(13,31,51,0.35)] transition hover:-translate-y-0.5 hover:bg-[var(--steel)]"
           aria-label="Open chatbot"
         >
           <MessageSquare className="h-4 w-4" />

@@ -90,7 +90,7 @@ export default async function RenewalsPage({
             <option value="renewed">renewed</option>
             <option value="lost">lost</option>
           </select>
-          <button type="submit" className="rounded-md bg-[#2563eb] px-4 py-2 text-sm font-semibold text-white hover:opacity-95">
+          <button type="submit" className="rounded-md bg-[var(--primary)] px-4 py-2 text-sm font-semibold text-white hover:opacity-95">
             Apply
           </button>
         </div>

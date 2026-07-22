@@ -75,7 +75,7 @@ export function LeadForm({ values }: { values?: LeadFormValues }) {
         </label>
       </div>
 
-      <button type="submit" className="rounded-md bg-[#2563eb] px-4 py-2 text-sm font-semibold text-white hover:opacity-95">
+      <button type="submit" className="rounded-md bg-[var(--primary)] px-4 py-2 text-sm font-semibold text-white hover:opacity-95">
         {values?.id ? "Update Lead" : "Create Lead"}
       </button>
     </form>

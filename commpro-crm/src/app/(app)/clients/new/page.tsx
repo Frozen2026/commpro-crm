@@ -75,7 +75,7 @@ export default async function NewClientPage({ searchParams }: NewClientPageProps
           <h2 className="text-2xl font-bold tracking-tight text-slate-900">New Client</h2>
           <p className="mt-1 text-sm text-slate-600">Create a client record with a simple server action form.</p>
         </div>
-        <Link href="/clients" className="text-sm font-medium text-[#2563eb]">
+        <Link href="/clients" className="text-sm font-medium text-[var(--primary)]">
           Back to Clients
         </Link>
       </div>

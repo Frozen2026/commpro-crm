@@ -37,7 +37,7 @@ export default async function EditClaimPage({ params }: { params: Promise<{ id: 
     <section className="space-y-4">
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-bold tracking-tight text-slate-900">Edit Claim</h2>
-        <Link href="/claims" className="text-sm font-medium text-[#2563eb]">
+        <Link href="/claims" className="text-sm font-medium text-[var(--primary)]">
           Back to Claims
         </Link>
       </div>

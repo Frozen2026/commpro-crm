@@ -53,7 +53,7 @@ export default async function OpsBrainPage() {
       <article className="space-y-3 rounded-xl border border-[var(--border)] bg-white p-5">
         <div className="flex items-center justify-between gap-2">
           <h3 className="text-sm font-semibold text-slate-900">Recent runs</h3>
-          <Link href="/settings" className="text-xs font-medium text-[#2563eb]">
+          <Link href="/settings" className="text-xs font-medium text-[var(--primary)]">
             Settings health
           </Link>
         </div>

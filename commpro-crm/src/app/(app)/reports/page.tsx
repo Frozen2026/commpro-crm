@@ -57,7 +57,7 @@ export default async function ReportsPage() {
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <article className="rounded-xl border border-[var(--border)] bg-white p-5">
           <p className="text-sm text-slate-600">Total Premium</p>
-          <p className="mt-2 text-2xl font-bold text-[#2563eb]">${totalPremium.toLocaleString(undefined, { maximumFractionDigits: 2 })}</p>
+          <p className="mt-2 text-2xl font-bold text-[var(--primary)]">${totalPremium.toLocaleString(undefined, { maximumFractionDigits: 2 })}</p>
           <p className="mt-1 text-xs text-slate-500">{activePolicies} active policies</p>
         </article>
 

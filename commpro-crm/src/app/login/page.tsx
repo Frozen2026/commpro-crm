@@ -45,10 +45,15 @@ function LoginForm() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center p-6">
-      <div className="w-full max-w-md rounded-xl border border-[var(--border)] bg-white p-8 shadow-sm">
-        <h1 className="mb-1 text-2xl font-bold tracking-tight text-slate-900">Welcome to CommPro.ai</h1>
-        <p className="mb-6 text-sm text-slate-600">Sign in to access your CRM workspace.</p>
+    <div className="flex min-h-screen items-center justify-center bg-[radial-gradient(circle_at_top,_rgba(232,147,26,0.12),_transparent_40%),linear-gradient(180deg,var(--steel-pale)_0%,var(--background)_55%)] p-6">
+      <div className="w-full max-w-md rounded-xl border border-[var(--border)] bg-[var(--surface)] p-8 shadow-sm">
+        <p className="mb-2 font-[family-name:var(--font-barlow-condensed)] text-xs font-bold uppercase tracking-[0.2em] text-[var(--accent)]">
+          Commercial Pro
+        </p>
+        <h1 className="mb-1 font-[family-name:var(--font-barlow-condensed)] text-3xl font-black uppercase tracking-tight text-[var(--steel)]">
+          Welcome to CommPro.ai
+        </h1>
+        <p className="mb-6 text-sm text-[var(--muted-foreground)]">Sign in to access your CRM workspace.</p>
         <form className="space-y-4" onSubmit={onSubmit}>
           <div>
             <label htmlFor="email" className="mb-1 block text-sm font-medium text-slate-700">
@@ -82,7 +87,7 @@ function LoginForm() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full rounded-md bg-[var(--primary)] px-4 py-2 text-sm font-semibold text-[var(--primary-foreground)] transition hover:opacity-95 disabled:opacity-75"
+            className="w-full rounded-md bg-[var(--accent)] px-4 py-2.5 font-[family-name:var(--font-barlow-condensed)] text-sm font-extrabold uppercase tracking-[0.08em] text-[var(--steel-dark)] transition hover:bg-[var(--accent-dark)] disabled:opacity-75"
           >
             {loading ? "Signing in..." : "Sign in"}
           </button>

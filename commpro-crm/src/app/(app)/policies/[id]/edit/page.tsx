@@ -48,7 +48,7 @@ export default async function EditPolicyPage({ params }: { params: Promise<{ id:
     <section className="space-y-4">
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-bold tracking-tight text-slate-900">Edit Policy</h2>
-        <Link href="/policies" className="text-sm font-medium text-[#2563eb]">
+        <Link href="/policies" className="text-sm font-medium text-[var(--primary)]">
           Back to Policies
         </Link>
       </div>

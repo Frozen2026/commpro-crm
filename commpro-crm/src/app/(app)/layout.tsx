@@ -35,14 +35,16 @@ export default async function AppLayout({
     <div className="min-h-screen md:flex">
       <SidebarNav />
       <section className="flex min-h-screen flex-1 flex-col">
-        <header className="flex items-center justify-between border-b border-[var(--border)] bg-white px-6 py-4">
+        <header className="flex items-center justify-between border-b border-[var(--border)] bg-[var(--surface)] px-6 py-4">
           <div>
-            <h1 className="text-lg font-semibold text-slate-900">CommPro.ai</h1>
-            <p className="text-sm text-slate-500">{user.email}</p>
+            <h1 className="font-[family-name:var(--font-barlow-condensed)] text-lg font-extrabold uppercase tracking-wide text-[var(--steel)]">
+              CommPro.ai
+            </h1>
+            <p className="text-sm text-[var(--muted)]">{user.email}</p>
           </div>
           <SignOutButton />
         </header>
-        <main className="flex-1 p-6">{children}</main>
+        <main className="flex-1 bg-[var(--background)] p-6">{children}</main>
       </section>
     </div>
   );

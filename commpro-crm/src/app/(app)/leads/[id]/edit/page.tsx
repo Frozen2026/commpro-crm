@@ -25,7 +25,7 @@ export default async function EditLeadPage({ params }: { params: Promise<{ id: s
     <section className="space-y-4">
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-bold tracking-tight text-slate-900">Edit Lead</h2>
-        <Link href="/leads" className="text-sm font-medium text-[#2563eb]">
+        <Link href="/leads" className="text-sm font-medium text-[var(--primary)]">
           Back to Leads
         </Link>
       </div>

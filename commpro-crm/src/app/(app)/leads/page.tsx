@@ -31,7 +31,7 @@ export default async function LeadsPage() {
           <h2 className="text-2xl font-bold tracking-tight text-slate-900">Leads</h2>
           <p className="mt-1 text-sm text-slate-600">Manage inbound pipeline and progression stages.</p>
         </div>
-        <Link href="/leads/new" className="rounded-md bg-[#2563eb] px-4 py-2 text-sm font-semibold text-white hover:opacity-95">
+        <Link href="/leads/new" className="rounded-md bg-[var(--primary)] px-4 py-2 text-sm font-semibold text-white hover:opacity-95">
           Add Lead
         </Link>
       </div>
@@ -59,7 +59,7 @@ export default async function LeadsPage() {
                   {lead.created_at ? new Date(lead.created_at).toLocaleDateString() : "-"}
                 </td>
                 <td className="px-4 py-3">
-                  <Link href={`/leads/${lead.id}/edit`} className="font-medium text-[#2563eb]">
+                  <Link href={`/leads/${lead.id}/edit`} className="font-medium text-[var(--primary)]">
                     Edit
                   </Link>
                 </td>

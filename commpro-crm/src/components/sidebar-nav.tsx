@@ -25,17 +25,23 @@ export function SidebarNav() {
   const pathname = usePathname();
 
   return (
-    <aside className="w-full border-b border-[var(--border)] bg-[var(--surface)] p-4 md:h-screen md:w-72 md:border-b-0 md:border-r md:p-6">
-      <div className="mb-5 flex items-center gap-2">
-        <div className="h-8 w-8 rounded-lg bg-[var(--primary)]" />
+    <aside className="w-full border-b border-[var(--border-dark)] bg-[var(--steel-dark)] p-4 text-white md:h-screen md:w-72 md:border-b-0 md:border-r md:p-6">
+      <div className="mb-5 flex items-center gap-3">
+        <div className="flex h-9 w-9 items-center justify-center rounded-md bg-[var(--accent)] font-[family-name:var(--font-barlow-condensed)] text-sm font-black text-[var(--steel-dark)]">
+          CP
+        </div>
         <div>
-          <p className="text-sm font-medium text-slate-500">CRM</p>
-          <p className="text-lg font-bold tracking-tight text-slate-900">CommPro.ai</p>
+          <p className="font-[family-name:var(--font-barlow-condensed)] text-[10px] font-semibold uppercase tracking-[0.18em] text-[#7aafd4]">
+            Commercial Pro
+          </p>
+          <p className="font-[family-name:var(--font-barlow-condensed)] text-lg font-black tracking-wide text-white">
+            CommPro CRM
+          </p>
         </div>
       </div>
-      <nav className="grid grid-cols-2 gap-2 md:grid-cols-1">
+      <nav className="grid grid-cols-2 gap-1.5 md:grid-cols-1">
         {navItems.map((item) => {
-          const active = pathname === item.href;
+          const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
 
           return (
             <Link
@@ -43,8 +49,8 @@ export function SidebarNav() {
               href={item.href}
               className={`rounded-md px-3 py-2 text-sm font-medium transition ${
                 active
-                  ? "bg-[var(--primary)] text-[var(--primary-foreground)]"
-                  : "text-slate-700 hover:bg-slate-100"
+                  ? "bg-[var(--accent)] text-[var(--steel-dark)]"
+                  : "text-[#a8c4da] hover:bg-white/10 hover:text-white"
               }`}
             >
               {item.label}
