@@ -19,14 +19,12 @@ export default async function ClientsPage() {
   const context = await getUserContext();
   const supabase = await createClient();
 
-  let query = supabase
+  // Account-scoped list so admins see every client on the account (not only owner_id matches).
+  const { data, error } = await supabase
     .from("clients")
     .select("id, business_name, email, phone, city, state, created_at")
+    .eq("account_id", context.accountId)
     .order("created_at", { ascending: false });
-
-  query = context.agencyId ? query.eq("agency_id", context.agencyId) : query.eq("owner_id", context.userId);
-
-  const { data, error } = await query;
 
   const supabaseError = error
     ? {
